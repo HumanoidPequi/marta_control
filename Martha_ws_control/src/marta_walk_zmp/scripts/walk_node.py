@@ -4,6 +4,7 @@
 from walk_calculations import WalkZmpCalculator
 import rospy
 from std_msgs.msg import Float64
+from sensor_msgs.msg import JointState  # Importa o tipo de mensagem JointState
 from geometry_msgs.msg import Twist
 
 class TimeIterationNodeWithTwist:
@@ -17,6 +18,9 @@ class TimeIterationNodeWithTwist:
         # Cria o publisher para publicar resultados de cálculos, se necessário
         self.publisher = rospy.Publisher('/calculated_value', Float64, queue_size=10)
 
+        # Cria o publisher para o tópico /coordinates_input (JointState)
+        self.coordinates_publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
+
         # Cria o subscriber para receber as mensagens do tipo Twist
         rospy.Subscriber('/cmd_vel', Twist, self.twist_callback)
 
@@ -28,8 +32,13 @@ class TimeIterationNodeWithTwist:
         self.v_y = 0.0
         self.v_angular = 0.0
 
+        # Variáveis de z_inicial e z_final
+        self.z_inicial = 0.2535  # ou qualquer valor inicial adequado
+        self.z_final = 0.2035    # ou qualquer valor final adequado
+
         # Define a taxa de execução (10 Hz)
         self.rate = rospy.Rate(10)  # 10 Hz
+
 
     def twist_callback(self, msg):
         """
@@ -59,21 +68,44 @@ class TimeIterationNodeWithTwist:
         Função que executa uma ação com base nos valores de velocidade recebidos.
         Aqui, você pode implementar a lógica desejada usando v_x, v_y e v_angular.
         """
+        walkingTime = elapsed_time
+        if (walkingTime >= self.calculator.params['period']):
+            walkingTime = 0
+            self.start_time = rospy.Time.now()
 
-        params = self.calculator.get_walking_params()
-        rospy.loginfo(params['period'])
+        self.compute_one_step(walkingTime)
+        
 
-        # Exemplo: Executar algum cálculo com as velocidades e o tempo decorrido
-        # Neste caso, apenas somando as velocidades e o tempo para um exemplo simples
-        result = self.v_x * elapsed_time + self.v_y * elapsed_time + self.v_angular * elapsed_time
+    def compute_one_step(self, elapsed_time):
+        # Obtém o valor de zFrac a partir do WalkZmpCalculator
+
+        zFrac = self.calculator.calculate_zFrac(elapsed_time)
+
+        # Calcula o novo valor de z
+        z = self.z_inicial + (self.z_final - self.z_inicial) * zFrac
+
+
+        # Log para ver o progresso de z
+        # rospy.loginfo("Tempo: %.2f, zFrac: %.2f, z_inicial: %.2f, z_final: %.2f, z: %.2f", elapsed_time, zFrac, self.z_inicial, self.z_final, z)
 
         # Publica o resultado no tópico /calculated_value
         msg = Float64()
-        msg.data = result
+        msg.data = z
         self.publisher.publish(msg)
 
-        # Log do valor calculado
-        # rospy.loginfo("Tempo: %.2f, Resultado calculado: %.2f", elapsed_time, result)
+        # Prepara a mensagem JointState para o tópico /coordinates_input
+        joint_state_msg = JointState()
+
+        # Inicializa as posições com 0 ou com valores padrão (modifique conforme necessário)
+        joint_state_msg.name = ['x_left', 'y_left', 'z_left', 'theta_left', 'x_right', 'y_right', 'z_right', 'theta_right']
+        joint_state_msg.position = [0.02, 0.0475, z, 0.0, 0.02, 0.0475, -0.2535, 0.0]  # Apenas z_left é atualizado com o valor de z
+
+        # Publica a mensagem JointState no tópico /coordinates_input
+        self.coordinates_publisher.publish(joint_state_msg)
+
+        # Log do valor calculado para JointState
+        rospy.loginfo("Publicando JointState: z_left=%.2f", z)
+
 
 if __name__ == '__main__':
     try:
