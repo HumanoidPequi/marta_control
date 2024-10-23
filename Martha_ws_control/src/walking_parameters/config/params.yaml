@@ -1,0 +1,14 @@
+walking_params:
+  upper_leg_length: 0.1
+  lower_leg_length: 0.1
+  hip_pitch0: 0.0
+  knee_pitch0: 0.0
+  ankle_pitch0: 0.0
+  torso_to_left_hip: [0.02, 0.037, -0.02]
+  left_ankle_to_left_foot: [0.0, 0.0105, -0.0335]
+  period: 0.4
+  doubleSupportRatio: 0.2
+  zCom: 0.18
+  zStep: 0.04
+  armCompensationFactor: 1.0
+  comSwingFactor: 0.5

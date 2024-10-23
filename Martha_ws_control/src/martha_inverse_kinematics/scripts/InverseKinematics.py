@@ -72,8 +72,8 @@ class InverseKinematics:
         x_right -= self.torso_to_left_hip[0]
         y_right += self.torso_to_left_hip[1]
 
-        z_left += self.torso_to_left_hip[2]
-        z_right += self.torso_to_left_hip[2]
+        z_left -= self.torso_to_left_hip[2]
+        z_right -= self.torso_to_left_hip[2]
 
         # print()
         # print("left_leg_desloc: ", x_left, y_left, z_left, theta_left)
@@ -89,8 +89,8 @@ class InverseKinematics:
         x_right -= self.left_ankle_to_left_foot[0]
         y_right += self.left_ankle_to_left_foot[1]
 
-        z_left += self.left_ankle_to_left_foot[2]
-        z_right += self.left_ankle_to_left_foot[2]
+        z_left -= self.left_ankle_to_left_foot[2]
+        z_right -= self.left_ankle_to_left_foot[2]
         
         print()
         print("left_leg_desloc: ", x_left, y_left, z_left, theta_left)

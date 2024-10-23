@@ -30,16 +30,8 @@ class WalkingNode:
         # Subscrição para receber as coordenadas das pernas
         rospy.Subscriber('/coordinates_input', JointState, self.coordinates_callback)
 
-        # Parâmetros físicos do robô
-        self.physical_parameters = {
-            'upper_leg_length': 0.100,
-            'lower_leg_length': 0.100,
-            'hip_pitch0': 0.0,
-            'knee_pitch0': 0.0,
-            'ankle_pitch0': 0.0,
-            'torso_to_left_hip': [0.02, 0.037, -0.02],
-            'left_ankle_to_left_foot': [0.0, 0.0105, -0.0335]
-        }
+        # Parâmetros físicos do robô carregados do servidor de parâmetros ROS
+        self.physical_parameters = self.load_physical_parameters()
 
         # Inicializa a cinemática inversa
         self.inverse_kinematics = InverseKinematics(self.physical_parameters)
@@ -87,6 +79,26 @@ class WalkingNode:
 
     def spin(self):
         rospy.spin()
+
+    def load_physical_parameters(self):
+        # Carregar os parâmetros do servidor de parâmetros ROS
+            parameters = {
+            'upper_leg_length': rospy.get_param('/walking_params/upper_leg_length', 0.1),
+            'lower_leg_length': rospy.get_param('/walking_params/lower_leg_length', 0.1),
+            'hip_pitch0': rospy.get_param('/walking_params/hip_pitch0', 0.0),
+            'knee_pitch0': rospy.get_param('/walking_params/knee_pitch0', 0.0),
+            'ankle_pitch0': rospy.get_param('/walking_params/ankle_pitch0', 0.0),
+            'torso_to_left_hip': rospy.get_param('/walking_params/torso_to_left_hip', [0.02, 0.037, -0.02]),
+            'left_ankle_to_left_foot': rospy.get_param('/walking_params/left_ankle_to_left_foot', [0.0, 0.0105, -0.0335]),
+            'period': rospy.get_param('/walking_params/period', 0.5),
+            'doubleSupportRatio': rospy.get_param('/walking_params/doubleSupportRatio', 0.2),
+            'zCom': rospy.get_param('/walking_params/zCom', 0.25),
+            'zStep': rospy.get_param('/walking_params/zStep', 0.05),
+            'armCompensationFactor': rospy.get_param('/walking_params/armCompensationFactor', 1.0),
+            'comSwingFactor': rospy.get_param('/walking_params/comSwingFactor', 0.5)
+            }
+            rospy.loginfo(f"Loaded physical parameters: {parameters}")
+            return parameters
 
 
 if __name__ == '__main__':

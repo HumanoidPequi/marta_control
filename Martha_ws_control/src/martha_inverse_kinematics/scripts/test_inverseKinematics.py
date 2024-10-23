@@ -25,8 +25,8 @@ ik = InverseKinematics(physical_parameters)
 
 # Cálculo dos ângulos das articulações para as duas pernas
 joints = ik.compute_joints_targets(
-    x_left=0.02, y_left=0.0475, z_left=0.2535, theta_left=0.0,
-    x_right=0.02, y_right=-0.0475, z_right=0.2535, theta_right=0.0
+    x_left=0.02, y_left=0.0475, z_left=-0.2535, theta_left=0.0,
+    x_right=0.02, y_right=-0.0475, z_right=-0.2535, theta_right=0.0
 )
 
 # Resultado
