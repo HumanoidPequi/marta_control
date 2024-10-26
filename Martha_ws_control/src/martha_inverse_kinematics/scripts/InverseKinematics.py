@@ -1,6 +1,7 @@
 #!usr/bin/env python3
 # -*- coding: utf-8 -*-
 import math
+from utils import *
 
 class InverseKinematics:
     def __init__(self, physical_parameters):
@@ -11,6 +12,7 @@ class InverseKinematics:
         self.ankle_pitch0 = physical_parameters['ankle_pitch0']
         self.torso_to_left_hip = physical_parameters['torso_to_left_hip']
         self.left_ankle_to_left_foot = physical_parameters['left_ankle_to_left_foot']
+        self.math_utils = MathUtils()
 
     def compute_joints_targets_one_leg(self, x, y, z, theta):
         # Distância no plano yz
@@ -35,12 +37,20 @@ class InverseKinematics:
             'hip_yaw': 0
         }
 
+        
+
         # Usar a lei dos cossenos para calcular os ângulos
         gamma = math.acos((a ** 2 + b ** 2 - c ** 2) / (2.0 * a * b))  # Ângulo do joelho
         beta = math.acos((a ** 2 + c ** 2 - b ** 2) / (2.0 * a * c))   # Ângulo do quadril
         alpha = math.acos((b ** 2 + c ** 2 - a ** 2) / (2.0 * b * c))  # Ângulo do tornozelo
 
-        print("alpha = ", alpha, ", beta = ", beta, ", gamma = ", gamma)
+        print(" pre alpha = ", alpha, ", beta = ", beta, ", gamma = ", gamma)
+
+        gamma = self.math_utils.normalize_angle_radians(gamma)
+        beta = self.math_utils.normalize_angle_radians(beta)
+        alpha = self.math_utils.normalize_angle_radians(alpha)
+
+        print(" pos alpha = ", alpha, ", beta = ", beta, ", gamma = ", gamma)
 
         # Ajustar os ângulos para os ângulos base do robô
         hip_pitch = -(math.atan2(x, yz) + beta) - self.hip_pitch0
@@ -52,12 +62,12 @@ class InverseKinematics:
         ankle_roll = -hip_roll
 
         return {
-            'hip_pitch': hip_pitch,
-            'knee_pitch': knee_pitch,
-            'ankle_pitch': ankle_pitch,
-            'hip_roll': hip_roll,
-            'ankle_roll': ankle_roll,
-            'hip_yaw': theta
+            'hip_pitch': self.math_utils.normalize_angle_radians(hip_pitch),
+            'knee_pitch': self.math_utils.normalize_angle_radians(knee_pitch),
+            'ankle_pitch': self.math_utils.normalize_angle_radians(ankle_pitch),
+            'hip_roll': self.math_utils.normalize_angle_radians(hip_roll),
+            'ankle_roll': self.math_utils.normalize_angle_radians(ankle_roll),
+            'hip_yaw': self.math_utils.normalize_angle_radians(theta)
         }
 
     def compute_joints_targets(self, x_left, y_left, z_left, theta_left, 

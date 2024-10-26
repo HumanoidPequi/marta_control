@@ -4,52 +4,87 @@
 from walk_calculations import WalkZmpCalculator
 import rospy
 from std_msgs.msg import Float64
-from sensor_msgs.msg import JointState  # Importa o tipo de mensagem JointState
-from geometry_msgs.msg import Twist
+from sensor_msgs.msg import JointState  # Importando o tipo de mensagem JointState
 
-class TimeIterationNodeWithTwist:
+class TimeIterationNodeWithXYZ:
     def __init__(self):
 
-        self.calculator = WalkZmpCalculator()
+        
 
         # Inicializa o nó ROS
-        rospy.init_node('time_iteration_with_twist_node', anonymous=True)
+        rospy.init_node('time_iteration_with_xyz_node', anonymous=True)
 
         # Cria o publisher para publicar resultados de cálculos, se necessário
         self.publisher = rospy.Publisher('/calculated_value', Float64, queue_size=10)
 
-        # Cria o publisher para o tópico /coordinates_input (JointState)
-        self.coordinates_publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
-
-        # Cria o subscriber para receber as mensagens do tipo Twist
-        rospy.Subscriber('/cmd_vel', Twist, self.twist_callback)
+         # Cria o publisher para enviar mensagens JointState para o tópico /coordinates_input
+        self.publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
 
         # Variável para armazenar o tempo inicial
         self.start_time = rospy.Time.now()
 
-        # Variáveis de controle de velocidades recebidas
-        self.v_x = 0.0
-        self.v_y = 0.0
-        self.v_angular = 0.0
-
-        # Variáveis de z_inicial e z_final
-        self.z_inicial = 0.2535  # ou qualquer valor inicial adequado
-        self.z_final = 0.2035    # ou qualquer valor final adequado
+        # Variáveis de controle para valores recebidos
+        self.x = 0.0
+        self.y = 0.0
+        self.z = 0.0
 
         # Define a taxa de execução (10 Hz)
-        self.rate = rospy.Rate(10)  # 10 Hz
+        self.rate = rospy.Rate(20)  # 10 Hz
 
 
-    def twist_callback(self, msg):
+        self.calculator = WalkZmpCalculator()
+
+        # Parâmetros físicos do robô carregados do servidor de parâmetros ROS
+        self.physical_parameters = self.load_physical_parameters()
+        self.walking_params = self.calculator.get_walking_params()
+
+
+
+        
+
+        # self.zero_pe = [0.02, 0.0475, -0.1535, 0.0, 0.02, -0.0475, -0.1535, 0.0]
+        self.zero_pe = [self.physical_parameters['torso_to_left_hip'][0],
+                        self.physical_parameters['torso_to_left_hip'][1] + self.physical_parameters['left_ankle_to_left_foot'][1],
+                        -(self.physical_parameters['torso_to_left_hip'][2] + self.physical_parameters['left_ankle_to_left_foot'][2] + self.physical_parameters['upper_leg_length'] + self.physical_parameters['lower_leg_length']) ,
+                        0,
+                        self.physical_parameters['torso_to_left_hip'][0],
+                        -(self.physical_parameters['torso_to_left_hip'][1] + self.physical_parameters['left_ankle_to_left_foot'][1]),
+                        -(self.physical_parameters['torso_to_left_hip'][2] + self.physical_parameters['left_ankle_to_left_foot'][2] + self.physical_parameters['upper_leg_length'] + self.physical_parameters['lower_leg_length']) ,
+                        0]
+
+        self.left_is_swing_foot = True
+
+        
+    def load_physical_parameters(self):
+        # Carregar os parâmetros do servidor de parâmetros ROS
+            parameters = {
+            'upper_leg_length': rospy.get_param('/walking_params/upper_leg_length', 0.1),
+            'lower_leg_length': rospy.get_param('/walking_params/lower_leg_length', 0.1),
+            'hip_pitch0': rospy.get_param('/walking_params/hip_pitch0', 0.0),
+            'knee_pitch0': rospy.get_param('/walking_params/knee_pitch0', 0.0),
+            'ankle_pitch0': rospy.get_param('/walking_params/ankle_pitch0', 0.0),
+            'torso_to_left_hip': rospy.get_param('/walking_params/torso_to_left_hip', [0.02, 0.037, -0.02]),
+            'left_ankle_to_left_foot': rospy.get_param('/walking_params/left_ankle_to_left_foot', [0.0, 0.0105, -0.0335]),
+            'period': rospy.get_param('/walking_params/period', 0.5),
+            'doubleSupportRatio': rospy.get_param('/walking_params/doubleSupportRatio', 0.2),
+            'zCom': rospy.get_param('/walking_params/zCom', 0.25),
+            'zStep': rospy.get_param('/walking_params/zStep', 0.05),
+            'armCompensationFactor': rospy.get_param('/walking_params/armCompensationFactor', 1.0),
+            'comSwingFactor': rospy.get_param('/walking_params/comSwingFactor', 0.5)
+            }
+            rospy.loginfo(f"Loaded physical parameters: {parameters}")
+            return parameters
+
+    def xyz_callback(self, msg):
         """
-        Callback que é chamado quando uma mensagem do tipo Twist é recebida.
-        Armazena os valores de v_x, v_y, e v_angular.
+        Callback que é chamado quando uma mensagem do tipo Point é recebida.
+        Armazena os valores de x, y e z.
         """
-        self.v_x = msg.linear.x   # Velocidade no eixo x
-        self.v_y = msg.linear.y   # Velocidade no eixo y
-        self.v_angular = msg.angular.z  # Velocidade angular (yaw)
+        self.x = msg.x   # Valor no eixo x
+        self.y = msg.y   # Valor no eixo y
+        self.z = msg.z   # Valor no eixo z
 
-        rospy.loginfo("Recebido: v_x=%.2f, v_y=%.2f, v_angular=%.2f", self.v_x, self.v_y, self.v_angular)
+        rospy.loginfo("Recebido: x=%.2f, y=%.2f, z=%.2f", self.x, self.y, self.z)
 
     def run(self):
         while not rospy.is_shutdown():
@@ -57,60 +92,51 @@ class TimeIterationNodeWithTwist:
             current_time = rospy.Time.now()
             elapsed_time = (current_time - self.start_time).to_sec()
 
+            # reseta o elapsed_time para fazer outro passo
+            if (elapsed_time >= self.physical_parameters['period']):
+                self.start_time = rospy.Time.now()
+                # troca perna
+                self.left_is_swing_foot = not self.left_is_swing_foot
+                # print("troca perna")
+            
             # Função que utiliza os valores recebidos para realizar algum cálculo
-            self.perform_action(elapsed_time)
+            self.rise_feet(elapsed_time, self.left_is_swing_foot)
 
             # Espera até a próxima iteração de acordo com a taxa definida (10 Hz)
             self.rate.sleep()
 
-    def perform_action(self, elapsed_time):
+    def rise_feet(self, elapsed_time, left_is_swing_foot):
         """
-        Função que executa uma ação com base nos valores de velocidade recebidos.
-        Aqui, você pode implementar a lógica desejada usando v_x, v_y e v_angular.
+        Função que executa uma ação com base nos valores recebidos.
+        Aqui, você pode implementar a lógica desejada usando x, y e z.
         """
-        walkingTime = elapsed_time
-        if (walkingTime >= self.calculator.params['period']):
-            walkingTime = 0
-            self.start_time = rospy.Time.now()
+        # phi = tempo/periodo --> adimensional de tempo
+        phi = self.calculator.calculate_phi(elapsed_time) 
+        point_swing_foot = [0 , 0 , self.walking_params['zStep']*self.calculator.calculate_zFrac(phi), 0]
 
-        self.compute_one_step(walkingTime)
-        
-
-    def compute_one_step(self, elapsed_time):
-        # Obtém o valor de zFrac a partir do WalkZmpCalculator
-
-        zFrac = self.calculator.calculate_zFrac(elapsed_time)
-
-        # Calcula o novo valor de z
-        z = self.z_inicial + (self.z_final - self.z_inicial) * zFrac
-
-
-        # Log para ver o progresso de z
-        # rospy.loginfo("Tempo: %.2f, zFrac: %.2f, z_inicial: %.2f, z_final: %.2f, z: %.2f", elapsed_time, zFrac, self.z_inicial, self.z_final, z)
+        if(left_is_swing_foot):
+            coordinates_swing_foot = point_swing_foot + [0, 0, 0, 0] #TODO: coordenada pe de suporte
+        else:
+            coordinates_swing_foot = [0, 0, 0, 0] + point_swing_foot
 
         # Publica o resultado no tópico /calculated_value
-        msg = Float64()
-        msg.data = z
+        msg = JointState()
+        msg.position = self.matrix_add(self.zero_pe , coordinates_swing_foot)
+        print(msg.position)
         self.publisher.publish(msg)
 
-        # Prepara a mensagem JointState para o tópico /coordinates_input
-        joint_state_msg = JointState()
 
-        # Inicializa as posições com 0 ou com valores padrão (modifique conforme necessário)
-        joint_state_msg.name = ['x_left', 'y_left', 'z_left', 'theta_left', 'x_right', 'y_right', 'z_right', 'theta_right']
-        joint_state_msg.position = [0.02, 0.0475, z, 0.0, 0.02, 0.0475, -0.2535, 0.0]  # Apenas z_left é atualizado com o valor de z
 
-        # Publica a mensagem JointState no tópico /coordinates_input
-        self.coordinates_publisher.publish(joint_state_msg)
-
-        # Log do valor calculado para JointState
-        rospy.loginfo("Publicando JointState: z_left=%.2f", z)
-
+    def matrix_add(self, mat1, mat2):
+        mat_buffer = []
+        for i in range(len(mat1)):
+            mat_buffer.append(mat1[i] + mat2[i])
+        return mat_buffer
 
 if __name__ == '__main__':
     try:
         # Cria o nó e começa a iterar
-        node = TimeIterationNodeWithTwist()
+        node = TimeIterationNodeWithXYZ()
         node.run()
     except rospy.ROSInterruptException:
         pass

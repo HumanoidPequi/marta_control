@@ -30,7 +30,7 @@ class WalkZmpCalculator:
             # Retorna os parâmetros como um dicionário
             return {
                 'period': period,
-                'step_height': zStep,
+                'zStep': zStep,
                 'doubleSupportRatio': doubleSupportRatio,
                 'zCom' : zCom,
                 'comSwingFactor': comSwingFactor,
@@ -97,12 +97,11 @@ class WalkZmpCalculator:
             return 0.5 * (1.0 - math.cos(math.pi * (t - t1) / (t2 - t1)))
         return 1.0
     def calculate_zFrac(self, t):
-        phi = self.calculate_phi(t)
         t1 = self.params['doubleSupportRatio']/2
         t2 = 1 - t1
     
-        if ( phi > t1 and phi < t2):
-            return 0.5 * (1.0 - math.cos( 2 * math.pi * (phi - t1) / (t2 - t1)))
+        if ( t > t1 and t < t2):
+            return 0.5 * (1.0 - math.cos( 2 * math.pi * (t - t1) / (t2 - t1)))
         return 0.0
 
 
@@ -117,18 +116,10 @@ if __name__ == '__main__':
     current_time = time.time()
 
     # Cálculo de phi = t / T, onde T é o período da caminhada
-    # phi = calculator.calculate_phi(start_time, current_time)
+    phi = calculator.calculate_phi(start_time)
+    # Cálculo de T1 e T2
 
-    print(calculator.params['period'])
-
-    for i in range(0 , 20 , 1):
-        norm = i/10
-        zFrac = calculator.calculate_zFrac(norm)
-        # Cálculo de T1 e T2
-
-        # Exibe o valor de phi, T1, e T2
-        print(f"Valor de i {norm:.2f} e de zFrac: {zFrac:.2f}")
-
-        -0.2535 + z
+    # Exibe o valor de phi, T1, e T2
+    print(f"Valor de phi: {phi:.2f}")
 
     # Continue fazendo outros cálculos ou utilize os parâmetros conforme necessário
