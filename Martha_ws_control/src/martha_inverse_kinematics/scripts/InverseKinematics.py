@@ -23,7 +23,7 @@ class InverseKinematics:
         a = self.upper_leg_length
         b = self.lower_leg_length
 
-        print("a=", a,", b=", b, ", c=", c)
+        # print("a=", a,", b=", b, ", c=", c)
 
 
         if((a ** 2 + b ** 2 - c ** 2) / (2.0 * a * b) > 1 or (a ** 2 + b ** 2 - c ** 2) / (2.0 * a * b) < -1):
@@ -44,13 +44,12 @@ class InverseKinematics:
         beta = math.acos((a ** 2 + c ** 2 - b ** 2) / (2.0 * a * c))   # Ângulo do quadril
         alpha = math.acos((b ** 2 + c ** 2 - a ** 2) / (2.0 * b * c))  # Ângulo do tornozelo
 
-        print(" pre alpha = ", alpha, ", beta = ", beta, ", gamma = ", gamma)
+        # gamma = self.math_utils.normalize_angle_radians(gamma)
+        # beta = self.math_utils.normalize_angle_radians(beta)
+        # alpha = self.math_utils.normalize_angle_radians(alpha)
 
-        gamma = self.math_utils.normalize_angle_radians(gamma)
-        beta = self.math_utils.normalize_angle_radians(beta)
-        alpha = self.math_utils.normalize_angle_radians(alpha)
-
-        print(" pos alpha = ", alpha, ", beta = ", beta, ", gamma = ", gamma)
+        print(" alpha = ", alpha, ", beta = ", beta, ", gamma = ", gamma)
+        print(" y = ", y, " z = ", z)
 
         # Ajustar os ângulos para os ângulos base do robô
         hip_pitch = -(math.atan2(x, yz) + beta) - self.hip_pitch0
@@ -62,12 +61,12 @@ class InverseKinematics:
         ankle_roll = -hip_roll
 
         return {
-            'hip_pitch': self.math_utils.normalize_angle_radians(hip_pitch),
-            'knee_pitch': self.math_utils.normalize_angle_radians(knee_pitch),
-            'ankle_pitch': self.math_utils.normalize_angle_radians(ankle_pitch),
-            'hip_roll': self.math_utils.normalize_angle_radians(hip_roll),
-            'ankle_roll': self.math_utils.normalize_angle_radians(ankle_roll),
-            'hip_yaw': self.math_utils.normalize_angle_radians(theta)
+            'hip_pitch': self.math_utils.normalize_pitch_angle_radians(hip_pitch),
+            'knee_pitch': self.math_utils.normalize_pitch_angle_radians(knee_pitch),
+            'ankle_pitch': self.math_utils.normalize_pitch_angle_radians(ankle_pitch),
+            'hip_roll': self.math_utils.normalize_roll_angle_radians(hip_roll),
+            'ankle_roll': self.math_utils.normalize_roll_angle_radians(ankle_roll),
+            'hip_yaw': theta
         }
 
     def compute_joints_targets(self, x_left, y_left, z_left, theta_left, 
@@ -103,8 +102,8 @@ class InverseKinematics:
         z_right -= self.left_ankle_to_left_foot[2]
         
         print()
-        print("left_leg_desloc: ", x_left, y_left, z_left, theta_left)
-        print("right_leg_desloc: ", x_right, y_right, z_right, theta_right)
+        # print("left_leg_desloc: ", x_left, y_left, z_left, theta_left)
+        # print("right_leg_desloc: ", x_right, y_right, z_right, theta_right)
 
         # Calcular os ângulos para ambas as pernas
         left_leg = self.compute_joints_targets_one_leg(x_left, y_left, z_left, theta_left)

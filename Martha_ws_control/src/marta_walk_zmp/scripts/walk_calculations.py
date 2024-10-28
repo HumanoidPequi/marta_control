@@ -48,19 +48,19 @@ class WalkZmpCalculator:
         phi = elapsed_time / period
         return phi
     
-    def calculate_m1m2(self, zs, z1, z2):
+    def calculate_m1m2(self, y_zmp_s, y_zmp_0, y_zmp_f):
         period = self.params['period']
         doubleSupportRatio = self.params['doubleSupportRatio']
     
         T1 = period*doubleSupportRatio/2                            # isto é na verdade T_b
         T2 = period - T1                                            # isto é na verdade T_e
 
-        m1 = (zs - z1)/ T1                                          # isto é na verdade m_d1
-        m2 = -(zs - z2)/(period - T2)                               # isto é na verdade m_d2
+        m1 = (y_zmp_s - y_zmp_0)/ T1                                          # isto é na verdade m_d1
+        m2 = -(y_zmp_s - y_zmp_f)/(period - T2)                               # isto é na verdade m_d2
         return m1, m2
 
     # Função para calcular T1 e T2 baseados no período e no doubleSupportRatio
-    def calculate_ZMP(self, zs, z1, z2, x1, x2):
+    def calculate_ZMP(self, y_zmp_s, y_zmp_0, y_zmp_f, x1, x2):
         period = self.params['period']
         doubleSupportRatio = self.params['doubleSupportRatio']
         tZMP = self.params['tZMP']
@@ -68,11 +68,11 @@ class WalkZmpCalculator:
         T1 = period*doubleSupportRatio/2                            # isto é na verdade T_b
         T2 = period - T1                                            # isto é na verdade T_e
 
-        m1 = (zs - z1)/ T1                                          # isto é na verdade m_d1
-        m2 = -(zs - z2)/(period - T2)                               # isto é na verdade m_d2
+        m1 = (y_zmp_s - y_zmp_0)/ T1                                          # isto é na verdade m_d1
+        m2 = -(y_zmp_s - y_zmp_f)/(period - T2)                               # isto é na verdade m_d2
 
-        c1 = x1 - z1 + tZMP * m1 * math.sinh(-T1/tZMP)              # isto é na verdade K_0
-        c2 = x2 - z2 + tZMP * m2 * math.sinh((period - T2)/tZMP)    # isto é na verdade K_f
+        c1 = x1 - y_zmp_0 + tZMP * m1 * math.sinh(-T1/tZMP)              # isto é na verdade K_0
+        c2 = x2 - y_zmp_f + tZMP * m2 * math.sinh((period - T2)/tZMP)    # isto é na verdade K_f
 
         expTStep = math.exp(period/tZMP)
 

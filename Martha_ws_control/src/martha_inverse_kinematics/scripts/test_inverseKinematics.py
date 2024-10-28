@@ -15,7 +15,7 @@ physical_parameters = {
 
 
 # esse eh o zero
-# rostopic pub /coordinates_input sensor_msgs/JointState "{position: [0.02, 0.0475, 0.2535, 0.0, 0.02, 0.0475, 0.2535, 0.0]}"
+# rostopic pub /coordinates_input sensor_msgs/JointState "{position: [0.02, 0.0475, -0.2535, 0.0, 0.02, -0.0475, -0.2535, 0.0]}"
 
 # esse eh o chute sla
 # rostopic pub /coordinates_input sensor_msgs/JointState "{position: [0.02, 0.0475, 0.2135, 0.0, 0.02, 0.0475, 0.2535, 0.0]}"

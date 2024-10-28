@@ -1,14 +1,19 @@
 walking_params:
   upper_leg_length: 0.1
   lower_leg_length: 0.1
-  hip_pitch0: -0.6435011087932841   ##
-  knee_pitch0: 1.287002217586569    ## isso desce a martha em 0.1 em z mas a 
-  ankle_pitch0: -0.6435011087932841 ##
+  # TODO: avaliar remocao
+  # hip_pitch0: -0.45102681179626236    ##
+  # knee_pitch0: 0.9020536235925247     ## isso desce a martha em 0.01 em z 
+  # ankle_pitch0: -0.45102681179626236  ##
+  hip_pitch0: 0   
+  knee_pitch0: 0
+  ankle_pitch0: 0
   torso_to_left_hip: [0.02, 0.037, -0.02]
   left_ankle_to_left_foot: [0.0, 0.0105, -0.0335]
   period: 5.0
   doubleSupportRatio: 0.2
-  zCom: 0.18
-  zStep: 0.07
+  zCom: 0.2235
+  ySeparation: 0.0575
+  zStep: 0.05
   armCompensationFactor: 1.0
   comSwingFactor: 0.5

@@ -9,7 +9,7 @@ from sensor_msgs.msg import JointState
 class WalkingNode:
     def __init__(self):
         # Inicializa o nó ROS
-        rospy.init_node('walking_node')
+        rospy.init_node('inverse_kinematics_node')
 
         # Publishers para os ângulos das articulações
         self.publishers = {
@@ -95,7 +95,8 @@ class WalkingNode:
             'zCom': rospy.get_param('/walking_params/zCom', 0.25),
             'zStep': rospy.get_param('/walking_params/zStep', 0.05),
             'armCompensationFactor': rospy.get_param('/walking_params/armCompensationFactor', 1.0),
-            'comSwingFactor': rospy.get_param('/walking_params/comSwingFactor', 0.5)
+            'comSwingFactor': rospy.get_param('/walking_params/comSwingFactor', 0.5),
+            'ySeparation' : rospy.get_param('/walking_params/ySeparation', 0.0475)
             }
             rospy.loginfo(f"Loaded physical parameters: {parameters}")
             return parameters
