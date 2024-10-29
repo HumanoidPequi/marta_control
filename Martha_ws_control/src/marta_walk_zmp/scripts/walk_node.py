@@ -66,6 +66,7 @@ class TimeIterationNodeWithXYZ:
 
         self.left_is_swing_foot = True
 
+
         
     def load_physical_parameters(self):
         # Carregar os parâmetros do servidor de parâmetros ROS
@@ -83,7 +84,6 @@ class TimeIterationNodeWithXYZ:
             'zStep': rospy.get_param('/walking_params/zStep', 0.05),
             'armCompensationFactor': rospy.get_param('/walking_params/armCompensationFactor', 1.0),
             'comSwingFactor': rospy.get_param('/walking_params/comSwingFactor', 0.5),
-            'ySeparation' : rospy.get_param('/walking_params/ySeparation', 0.0475)
             }
             rospy.loginfo(f"Loaded physical parameters: {parameters}")
             return parameters
@@ -148,31 +148,35 @@ class TimeIterationNodeWithXYZ:
         return self.matrix_add(self.v_zero_pe , coordinates_foot)
 
     def swing_feet(self, left_is_swing_foot, phi, coordinates_foot):
-        p_0 = self.y_zero
-        p_s = self.physical_parameters['ySeparation']
-        p_f = self.y_zero
+        p_0 = 0
+        p_s = self.y_zero
+        p_f = 0
 
 
         md1, md2 = self.calculator.calculate_m1m2(p_s, p_0, p_f)
         # a_s, b_s = self.calculator.calculate_ZMP(p_s, p_0, p_f, x_0, x_f)
 
-        t1 = self.physical_parameters['doubleSupportRatio']/2
-        t2 = - t1
 
-        # if ( t1 < phi):
-        #     p_t = p_0 + md1*phi*self.physical_parameters['period']
-        # elif (phi < t2):
-        #     p_t = p_s
-        # else:
-        #     p_t = p_s + md2*(phi-t2)*self.physical_parameters['period']
-        p_t = 0.08
-        print(p_t)
+        t1 = self.physical_parameters['doubleSupportRatio']/2
+        t2 = 1.0 - t1
+
+
+        # print(phi)
+        if ( phi < t1):
+            p_t = p_0 + md1*phi*self.physical_parameters['period']
+        elif (phi < t2):
+            p_t = p_s
+        else:
+            p_t = p_s + md2*(phi-t2)*self.physical_parameters['period']
+            print()
+        
+        y_support_foot = p_t#*self.calculator.calculate_yFrac(phi)
 
         # se o pe esquerdo levanta, coloca o zmp no direito. vice versa
         if (left_is_swing_foot):
-            point_swing_foot = [0, 0, 0, 0] + [ 0, -p_t, 0, 0]
+            point_swing_foot = [0, 0, 0, 0] + [ 0, -y_support_foot, 0, 0]
         else:
-            point_swing_foot = [ 0, p_t, 0, 0] + [0, 0, 0, 0]
+            point_swing_foot = [ 0, y_support_foot, 0, 0] + [0, 0, 0, 0]
 
         return self.matrix_add(coordinates_foot, point_swing_foot)    
 

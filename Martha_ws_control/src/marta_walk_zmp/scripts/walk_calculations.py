@@ -22,6 +22,7 @@ class WalkZmpCalculator:
             doubleSupportRatio = rospy.get_param('/walking_params/doubleSupportRatio')
             zCom = rospy.get_param('/walking_params/zCom')
             comSwingFactor = rospy.get_param('/walking_params/comSwingFactor')
+            ySeparation = rospy.get_param('/walking_params/ySeparation', 0.0475)
 
             GRAVITY = 9.80665
             tZMP = math.sqrt(zCom*comSwingFactor/GRAVITY)**(-1)
@@ -34,7 +35,8 @@ class WalkZmpCalculator:
                 'doubleSupportRatio': doubleSupportRatio,
                 'zCom' : zCom,
                 'comSwingFactor': comSwingFactor,
-                'tZMP' : tZMP
+                'tZMP' : tZMP,
+                'ySeparation' : ySeparation 
             }
 
         except KeyError as e:

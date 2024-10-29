@@ -54,18 +54,18 @@ class InverseKinematics:
         # Ajustar os ângulos para os ângulos base do robô
         hip_pitch = -(math.atan2(x, yz) + beta) - self.hip_pitch0
         knee_pitch = math.pi - gamma - self.knee_pitch0
-        ankle_pitch = math.atan2(x, yz) - alpha - self.ankle_pitch0
+        ankle_pitch = math.atan(x/yz) - alpha - self.ankle_pitch0 
 
         # Calcular os ângulos de rotação lateral
-        hip_roll = math.atan2(y, z)
+        hip_roll = math.atan(y/z)
         ankle_roll = -hip_roll
 
         return {
-            'hip_pitch': self.math_utils.normalize_pitch_angle_radians(hip_pitch),
-            'knee_pitch': self.math_utils.normalize_pitch_angle_radians(knee_pitch),
-            'ankle_pitch': self.math_utils.normalize_pitch_angle_radians(ankle_pitch),
-            'hip_roll': self.math_utils.normalize_roll_angle_radians(hip_roll),
-            'ankle_roll': self.math_utils.normalize_roll_angle_radians(ankle_roll),
+            'hip_pitch': hip_pitch,
+            'knee_pitch': knee_pitch,
+            'ankle_pitch': ankle_pitch,
+            'hip_roll': hip_roll,
+            'ankle_roll': ankle_roll,
             'hip_yaw': theta
         }
 

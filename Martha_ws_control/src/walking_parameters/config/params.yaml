@@ -13,7 +13,7 @@ walking_params:
   period: 5.0
   doubleSupportRatio: 0.2
   zCom: 0.2235
-  ySeparation: 0.0575
+  ySeparation: 0.0375
   zStep: 0.05
   armCompensationFactor: 1.0
   comSwingFactor: 0.5
