@@ -62,7 +62,7 @@ class WalkZmpCalculator:
         return m1, m2
 
     # Função para calcular T1 e T2 baseados no período e no doubleSupportRatio
-    def calculate_ZMP(self, y_zmp_s, y_zmp_0, y_zmp_f, x1, x2):
+    def calculate_params_ZMP(self, y_zmp_s, y_zmp_0, y_zmp_f, x1, x2):
         period = self.params['period']
         doubleSupportRatio = self.params['doubleSupportRatio']
         tZMP = self.params['tZMP']
@@ -82,6 +82,25 @@ class WalkZmpCalculator:
         aN = (c1 * expTStep - c2) / (expTStep - 1/expTStep)         # isto é na verdade b_s
         return aP, aN
     
+    def get_CoM(self, phi, aP, aN, zs, z1, z2):
+        tZMP = self.params['tZMP']
+        period = self.params['period']
+        t1 = self.params['doubleSupportRatio']/2
+        t2 = 1 - t1
+
+        expT = math.exp(self.params['period'] * phi / self.params['tZMP'])
+        com = aP * expT + aN / expT
+
+        m1, m2 = self.calculate_m1m2(zs, z1, z2)
+
+        if (phi < t1):
+            com += z1 + m1*period*phi - tZMP*m1*math.sinh(period*(phi - t1)/tZMP)
+        elif (phi < t2):
+            com += zs
+        else:
+            com += zs + m2*period*(phi-t2) - tZMP*m2*math.sinh(period*(phi - t2)/tZMP)
+        return com
+
     def calculate_xFrac(self, t):
         t1 = self.params['doubleSupportRatio']/2
         t2 = 1 - t1

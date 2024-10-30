@@ -119,12 +119,14 @@ class TimeIterationNodeWithXYZ:
             phi = self.calculator.calculate_phi(elapsed_time) 
             
             # Função que utiliza os valores recebidos para realizar algum cálculo
-            coordinates_foot = self.rise_feet(self.left_is_swing_foot, phi)
-            coordinates_foot = self.swing_feet(self.left_is_swing_foot, phi, coordinates_foot)
+            coordinates_foot_z = self.rise_feet(self.left_is_swing_foot, phi)
+            coordinates_foot_y = self.swing_feet(self.left_is_swing_foot, phi)
+            # coordinates_foot_x = 
 
+            foot_coordinates = self.matrix_add_3(coordinates_foot_z, coordinates_foot_y, [0,0,0,0, 0,0,0,0])
             # publica mensagem
             msg = JointState()
-            msg.position = coordinates_foot
+            msg.position = self.matrix_add(foot_coordinates, self.v_zero_pe)
             # print position
             print(msg.position)
             self.publisher.publish(msg)
@@ -145,40 +147,23 @@ class TimeIterationNodeWithXYZ:
             coordinates_foot = [0, 0, 0, 0] + point_swing_foot
 
         # Publica o resultado no tópico /calculated_value
-        return self.matrix_add(self.v_zero_pe , coordinates_foot)
+        return coordinates_foot
 
-    def swing_feet(self, left_is_swing_foot, phi, coordinates_foot):
+    def swing_feet(self, left_is_swing_foot, phi):
         p_0 = 0
         p_s = self.y_zero
         p_f = 0
 
-
-        md1, md2 = self.calculator.calculate_m1m2(p_s, p_0, p_f)
-        # a_s, b_s = self.calculator.calculate_ZMP(p_s, p_0, p_f, x_0, x_f)
-
-
-        t1 = self.physical_parameters['doubleSupportRatio']/2
-        t2 = 1.0 - t1
-
-
-        # print(phi)
-        if ( phi < t1):
-            p_t = p_0 + md1*phi*self.physical_parameters['period']
-        elif (phi < t2):
-            p_t = p_s
-        else:
-            p_t = p_s + md2*(phi-t2)*self.physical_parameters['period']
-            print()
-        
-        y_support_foot = p_t#*self.calculator.calculate_yFrac(phi)
+        aPy, aNy = self.calculator.calculate_params_ZMP(p_s, p_0, p_f, p_s, 0)
+        y_support_foot = self.calculator.get_CoM(phi, aPy, aNy, 0, p_s, p_s)
 
         # se o pe esquerdo levanta, coloca o zmp no direito. vice versa
         if (left_is_swing_foot):
-            point_swing_foot = [0, 0, 0, 0] + [ 0, -y_support_foot, 0, 0]
+            coordinates_foot = [0, y_support_foot, 0, 0] + [ 0, y_support_foot, 0, 0]
         else:
-            point_swing_foot = [ 0, y_support_foot, 0, 0] + [0, 0, 0, 0]
+            coordinates_foot = [ 0, -y_support_foot, 0, 0] + [0, -y_support_foot, 0, 0]
 
-        return self.matrix_add(coordinates_foot, point_swing_foot)    
+        return coordinates_foot
 
 
 
@@ -187,6 +172,12 @@ class TimeIterationNodeWithXYZ:
         mat_buffer = []
         for i in range(len(mat1)):
             mat_buffer.append(mat1[i] + mat2[i])
+        return mat_buffer
+    
+    def matrix_add_3(self, mat1, mat2, mat3):
+        mat_buffer = []
+        for i in range(len(mat1)):
+            mat_buffer.append(mat1[i] + mat2[i] + mat3[i])
         return mat_buffer
     
     def rotation_coordinates(self, v_x, v_y, v_z, period):
