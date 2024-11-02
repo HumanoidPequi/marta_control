@@ -57,7 +57,7 @@ class InverseKinematics:
         ankle_pitch = math.atan(x/yz) - alpha - self.ankle_pitch0 
 
         # Calcular os ângulos de rotação lateral
-        hip_roll = math.atan(y/z)
+        hip_roll = -math.atan(y/z)
         ankle_roll = -hip_roll
 
         return {

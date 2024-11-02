@@ -9,14 +9,11 @@ from sensor_msgs.msg import JointState  # Importando o tipo de mensagem JointSta
 
 class TimeIterationNodeWithXYZ:
     def __init__(self):
-
-        
-
         # Inicializa o nó ROS
         rospy.init_node('walk_node')
 
         # Cria o publisher para publicar resultados de cálculos, se necessário
-        self.publisher = rospy.Publisher('/calculated_value', Float64, queue_size=10)
+        # self.publisher = rospy.Publisher('/calculated_value', Float64, queue_size=10)
 
          # Cria o publisher para enviar mensagens JointState para o tópico /coordinates_input
         self.publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
@@ -65,6 +62,11 @@ class TimeIterationNodeWithXYZ:
                             0]            
 
         self.left_is_swing_foot = True
+
+        
+
+
+        self.torso_begin_x = 0
 
 
         
@@ -118,17 +120,24 @@ class TimeIterationNodeWithXYZ:
             # phi = tempo/periodo --> adimensional de tempo
             phi = self.calculator.calculate_phi(elapsed_time) 
             
+            if (phi > 1.0):
+                phi = 1.0
+
+
             # Função que utiliza os valores recebidos para realizar algum cálculo
             coordinates_foot_z = self.rise_feet(self.left_is_swing_foot, phi)
             coordinates_foot_y = self.swing_feet(self.left_is_swing_foot, phi)
-            # coordinates_foot_x = 
+            coordinates_foot_x = self.stride_feet(self.left_is_swing_foot, phi)
 
-            foot_coordinates = self.matrix_add_3(coordinates_foot_z, coordinates_foot_y, [0,0,0,0, 0,0,0,0])
+            # coordinates_foot_z = [0,0,0,0, 0,0,0,0]
+
+            foot_coordinates = self.matrix_add_3(coordinates_foot_z, coordinates_foot_y, coordinates_foot_x)
             # publica mensagem
             msg = JointState()
             msg.position = self.matrix_add(foot_coordinates, self.v_zero_pe)
             # print position
-            print(msg.position)
+            # print(msg.position)
+            rospy.loginfo("[ %.4f, %.4f, %.4f, %.4f,  %.4f, %.4f, %.4f, %.4f]", foot_coordinates[0], foot_coordinates[1], foot_coordinates[2], foot_coordinates[3], foot_coordinates[4], foot_coordinates[5], foot_coordinates[6], foot_coordinates[7])
             self.publisher.publish(msg)
             # Espera até a próxima iteração de acordo com a taxa definida (10 Hz)
             self.rate.sleep()
@@ -150,21 +159,59 @@ class TimeIterationNodeWithXYZ:
         return coordinates_foot
 
     def swing_feet(self, left_is_swing_foot, phi):
+        # parametros de posicao do zmp
         p_0 = 0
         p_s = self.y_zero
         p_f = 0
 
-        aPy, aNy = self.calculator.calculate_params_ZMP(p_s, p_0, p_f, p_s, 0)
-        y_support_foot = self.calculator.get_CoM(phi, aPy, aNy, 0, p_s, p_s)
+        # md1, md2 = self.calculator.calculate_m1m2(p_s, p_0, p_f)
+        # if (phi < t1):
+        #     p_t = p_0 + md1*phi*period
+        #     # print("primeiro if")
+        # elif (phi < t2):
+        #     p_t = p_s
+        # else:
+        #     p_t = p_s + md2*(phi - t2)*period
+
+        # print(p_t, phi)
+
+
+        aPy, aNy = self.calculator.calculate_params_ZMP(p_s, p_0, p_f, 0, 0)
+        y_support_foot = self.calculator.get_CoM(phi, aPy, aNy, p_s, p_0, p_f)*self.calculator.calculate_yFrac(phi)
+        # y_support_foot = p_t
+
+        # if (phi > 1.0):
+        #     y_support_foot = 0
+        # print(y_support_foot)
 
         # se o pe esquerdo levanta, coloca o zmp no direito. vice versa
         if (left_is_swing_foot):
-            coordinates_foot = [0, y_support_foot, 0, 0] + [ 0, y_support_foot, 0, 0]
+            coordinates_foot = [0, -y_support_foot, 0, 0] + [ 0, -y_support_foot, 0, 0]
         else:
-            coordinates_foot = [ 0, -y_support_foot, 0, 0] + [0, -y_support_foot, 0, 0]
+            coordinates_foot = [ 0, y_support_foot, 0, 0] + [0, y_support_foot, 0, 0]
 
         return coordinates_foot
 
+    def stride_feet(self, left_is_swing_foot, phi):
+        self.v_x = 0.001
+        period = self.physical_parameters['period']
+
+        p_x_0 = 0
+        p_x_s = self.v_x*period
+        p_x_f = self.v_x*2*period
+
+        aPy, aNy = self.calculator.calculate_params_ZMP(p_x_s, p_x_0, p_x_f, 0, p_x_f)
+        x_support_foot = self.calculator.get_CoM(phi, aPy, aNy, p_x_s, p_x_0, p_x_f)*self.calculator.calculate_xFrac(phi)
+
+        print(x_support_foot)
+        # se o pe esquerdo levanta, avanca o esquerdo e recua direito. vice versa
+        if (left_is_swing_foot):
+            coordinates_foot = [x_support_foot, 0, 0, 0] + [ -x_support_foot, 0, 0, 0]
+        else:
+            coordinates_foot = [-x_support_foot, 0, 0, 0] + [x_support_foot, 0, 0, 0]
+
+        # coordinates_foot = [0,0,0,0, 0,0,0,0]
+        return coordinates_foot
 
 
 

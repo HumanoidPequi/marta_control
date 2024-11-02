@@ -8,12 +8,12 @@ walking_params:
   hip_pitch0: 0   
   knee_pitch0: 0
   ankle_pitch0: 0
-  torso_to_left_hip: [0.02, 0.037, -0.02]
-  left_ankle_to_left_foot: [0.0, 0.0105, -0.0335]
+  torso_to_left_hip: [0.0, 0.008, -0.02]
+  left_ankle_to_left_foot: [-0.013, -0.040, -0.035]
   period: 5.0
   doubleSupportRatio: 0.2
   zCom: 0.2235
   ySeparation: 0.0375
-  zStep: 0.05
+  zStep: 0.005
   armCompensationFactor: 1.0
   comSwingFactor: 0.5
