@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import rospy
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, Int16MultiArray
 from InverseKinematics import InverseKinematics
 from sensor_msgs.msg import JointState
 
@@ -10,22 +10,30 @@ class WalkingNode:
     def __init__(self):
         # Inicializa o nó ROS
         rospy.init_node('inverse_kinematics_node')
+        self.condition = input("Are you using the simulation? (y/n): ")
 
-        # Publishers para os ângulos das articulações
-        self.publishers = {
-            'hip_pitch_left': rospy.Publisher('/martha/l_hip_pitch_position/command', Float64, queue_size=10),
-            'knee_pitch_left': rospy.Publisher('/martha/l_knee_position/command', Float64, queue_size=10),
-            'ankle_pitch_left': rospy.Publisher('/martha/l_ank_pitch_position/command', Float64, queue_size=10),
-            'hip_roll_left': rospy.Publisher('/martha/l_hip_roll_position/command', Float64, queue_size=10),
-            'ankle_roll_left': rospy.Publisher('/martha/l_ank_roll_position/command', Float64, queue_size=10),
-            'hip_yaw_left': rospy.Publisher('/martha/l_hip_yaw_position/command', Float64, queue_size=10),
-            'hip_pitch_right': rospy.Publisher('/martha/r_hip_pitch_position/command', Float64, queue_size=10),
-            'knee_pitch_right': rospy.Publisher('/martha/r_knee_position/command', Float64, queue_size=10),
-            'ankle_pitch_right': rospy.Publisher('/martha/r_ank_pitch_position/command', Float64, queue_size=10),
-            'hip_roll_right': rospy.Publisher('/martha/r_hip_roll_position/command', Float64, queue_size=10),
-            'ankle_roll_right': rospy.Publisher('/martha/r_ank_roll_position/command', Float64, queue_size=10),
-            'hip_yaw_right': rospy.Publisher('/martha/r_hip_yaw_position/command', Float64, queue_size=10),
-        }
+        if self.condition == 'y':
+            print("Simulation mode")
+            # Publishers para os ângulos das articulações
+            self.publishers = {
+                'hip_pitch_left': rospy.Publisher('/martha/l_hip_pitch_position/command', Float64, queue_size=10),
+                'knee_pitch_left': rospy.Publisher('/martha/l_knee_position/command', Float64, queue_size=10),
+                'ankle_pitch_left': rospy.Publisher('/martha/l_ank_pitch_position/command', Float64, queue_size=10),
+                'hip_roll_left': rospy.Publisher('/martha/l_hip_roll_position/command', Float64, queue_size=10),
+                'ankle_roll_left': rospy.Publisher('/martha/l_ank_roll_position/command', Float64, queue_size=10),
+                'hip_yaw_left': rospy.Publisher('/martha/l_hip_yaw_position/command', Float64, queue_size=10),
+                'hip_pitch_right': rospy.Publisher('/martha/r_hip_pitch_position/command', Float64, queue_size=10),
+                'knee_pitch_right': rospy.Publisher('/martha/r_knee_position/command', Float64, queue_size=10),
+                'ankle_pitch_right': rospy.Publisher('/martha/r_ank_pitch_position/command', Float64, queue_size=10),
+                'hip_roll_right': rospy.Publisher('/martha/r_hip_roll_position/command', Float64, queue_size=10),
+                'ankle_roll_right': rospy.Publisher('/martha/r_ank_roll_position/command', Float64, queue_size=10),
+                'hip_yaw_right': rospy.Publisher('/martha/r_hip_yaw_position/command', Float64, queue_size=10),
+            }
+        elif self.condition == 'n':
+            self.publishers = {
+                'left_leg_pub': rospy.Publisher('/marta/left_leg/command', Int16MultiArray, queue_size=10),
+                'right_leg_pub': rospy.Publisher('/marta/right_leg/command', Int16MultiArray, queue_size=10),
+            }
 
         # Subscrição para receber as coordenadas das pernas
         rospy.Subscriber('/coordinates_input', JointState, self.coordinates_callback)
@@ -58,21 +66,36 @@ class WalkingNode:
     def publish_angles(self, joints):
         # Publicar os ângulos da perna esquerda
         left_leg = joints['left_leg']
-        self.publishers['hip_pitch_left'].publish(left_leg['hip_pitch'])
-        self.publishers['knee_pitch_left'].publish(left_leg['knee_pitch'])
-        self.publishers['ankle_pitch_left'].publish(left_leg['ankle_pitch'])
-        self.publishers['hip_roll_left'].publish(left_leg['hip_roll'])
-        self.publishers['ankle_roll_left'].publish(left_leg['ankle_roll'])
-        self.publishers['hip_yaw_left'].publish(left_leg['hip_yaw'])
-
-        # Publicar os ângulos da perna direita
         right_leg = joints['right_leg']
-        self.publishers['hip_pitch_right'].publish(right_leg['hip_pitch'])
-        self.publishers['knee_pitch_right'].publish(right_leg['knee_pitch'])
-        self.publishers['ankle_pitch_right'].publish(right_leg['ankle_pitch'])
-        self.publishers['hip_roll_right'].publish(right_leg['hip_roll'])
-        self.publishers['ankle_roll_right'].publish(right_leg['ankle_roll'])
-        self.publishers['hip_yaw_right'].publish(right_leg['hip_yaw'])
+        if self.condition == 'y':
+            self.publishers['hip_pitch_left'].publish(left_leg['hip_pitch'])
+            self.publishers['knee_pitch_left'].publish(left_leg['knee_pitch'])
+            self.publishers['ankle_pitch_left'].publish(left_leg['ankle_pitch'])
+            self.publishers['hip_roll_left'].publish(left_leg['hip_roll'])
+            self.publishers['ankle_roll_left'].publish(left_leg['ankle_roll'])
+            self.publishers['hip_yaw_left'].publish(left_leg['hip_yaw'])
+
+            # Publicar os ângulos da perna direita
+            
+            self.publishers['hip_pitch_right'].publish(right_leg['hip_pitch'])
+            self.publishers['knee_pitch_right'].publish(right_leg['knee_pitch'])
+            self.publishers['ankle_pitch_right'].publish(right_leg['ankle_pitch'])
+            self.publishers['hip_roll_right'].publish(right_leg['hip_roll'])
+            self.publishers['ankle_roll_right'].publish(right_leg['ankle_roll'])
+            self.publishers['hip_yaw_right'].publish(right_leg['hip_yaw'])
+        
+        elif self.condition == 'n':
+            left_leg_msg = Int16MultiArray()
+            left_leg_msg.data = [int(10 * left_leg['hip_pitch']), int(10 * left_leg['knee_pitch']), 
+                                 int(10 * left_leg['ankle_pitch']), int(10 * left_leg['hip_roll']), 
+                                 int(10 * left_leg['ankle_roll']), int(10 * left_leg['hip_yaw'])]
+            right_leg_msg = Int16MultiArray()
+            right_leg_msg.data = [int(10 * right_leg['hip_pitch']), int(10 * right_leg['knee_pitch']), 
+                                  int(10 * right_leg['ankle_pitch']), int(10 * right_leg['hip_roll']), 
+                                  int(10 * right_leg['ankle_roll']), int(10 * right_leg['hip_yaw'])]
+            
+            self.publishers['left_leg_pub'].publish(left_leg_msg)
+            self.publishers['right_leg_pub'].publish(right_leg_msg)
 
         print("left_leg_angles: ", left_leg)
         print("right_leg_angles: ", right_leg)
