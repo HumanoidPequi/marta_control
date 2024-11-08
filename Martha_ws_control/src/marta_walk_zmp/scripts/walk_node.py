@@ -136,8 +136,8 @@ class TimeIterationNodeWithXYZ:
             msg = JointState()
             msg.position = self.matrix_add(foot_coordinates, self.v_zero_pe)
             # print position
-            # print(msg.position)
-            rospy.loginfo("[ %.4f, %.4f, %.4f, %.4f,  %.4f, %.4f, %.4f, %.4f]", foot_coordinates[0], foot_coordinates[1], foot_coordinates[2], foot_coordinates[3], foot_coordinates[4], foot_coordinates[5], foot_coordinates[6], foot_coordinates[7])
+            print(self.v_zero_pe)
+            # rospy.loginfo("[ %.4f, %.4f, %.4f, %.4f,  %.4f, %.4f, %.4f, %.4f]", foot_coordinates[0], foot_coordinates[1], foot_coordinates[2], foot_coordinates[3], foot_coordinates[4], foot_coordinates[5], foot_coordinates[6], foot_coordinates[7])
             self.publisher.publish(msg)
             # Espera até a próxima iteração de acordo com a taxa definida (10 Hz)
             self.rate.sleep()
