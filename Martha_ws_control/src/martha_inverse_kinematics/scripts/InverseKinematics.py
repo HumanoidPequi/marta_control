@@ -49,7 +49,7 @@ class InverseKinematics:
         # alpha = self.math_utils.normalize_angle_radians(alpha)
 
         print(" alpha = ", alpha, ", beta = ", beta, ", gamma = ", gamma)
-        print(" y = ", y, " z = ", z)
+        print("x = ", x," y = ", y, " z = ", z)
 
         # Ajustar os ângulos para os ângulos base do robô
         hip_pitch = -(math.atan2(x, yz) + beta) - self.hip_pitch0

@@ -86,13 +86,13 @@ class WalkingNode:
         
         elif self.condition == 'n':
             left_leg_msg = Int16MultiArray()
-            left_leg_msg.data = [int(10 * left_leg['hip_pitch']), int(10 * left_leg['knee_pitch']), 
-                                 int(10 * left_leg['ankle_pitch']), int(10 * left_leg['hip_roll']), 
-                                 int(10 * left_leg['ankle_roll']), int(10 * left_leg['hip_yaw'])]
+            left_leg_msg.data = [int(10 * left_leg['hip_yaw']), int(10 * left_leg['hip_roll']), 
+                                 int(10 * left_leg['hip_pitch']), int(10 * left_leg['knee_pitch']), 
+                                 int(10 * left_leg['ankle_pitch']), int(10 * left_leg['ankle_roll'])]
             right_leg_msg = Int16MultiArray()
-            right_leg_msg.data = [int(10 * right_leg['hip_pitch']), int(10 * right_leg['knee_pitch']), 
-                                  int(10 * right_leg['ankle_pitch']), int(10 * right_leg['hip_roll']), 
-                                  int(10 * right_leg['ankle_roll']), int(10 * right_leg['hip_yaw'])]
+            right_leg_msg.data = [int(10 * right_leg['hip_yaw']), int(10 * right_leg['hip_roll']), 
+                                  int(10 * right_leg['hip_pitch']), int(10 * right_leg['knee_pitch']), 
+                                  int(10 * right_leg['ankle_pitch']), int(10 * right_leg['ankle_roll'])]
             
             self.publishers['left_leg_pub'].publish(left_leg_msg)
             self.publishers['right_leg_pub'].publish(right_leg_msg)
