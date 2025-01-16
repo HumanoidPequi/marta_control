@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import rospy
-from std_msgs.msg import Float64, Int16MultiArray
+from std_msgs.msg import Float64, Float64MultiArray
 from InverseKinematics import InverseKinematics
 from sensor_msgs.msg import JointState
 
@@ -10,7 +10,12 @@ class WalkingNode:
     def __init__(self):
         # Inicializa o nó ROS
         rospy.init_node('inverse_kinematics_node')
-        self.condition = input("Are you using the simulation? (y/n): ")
+
+        # Define a taxa de execução (10 Hz)
+        self.rate = rospy.Rate(100)  # 10 Hz
+
+        #self.condition = input("Are you using the simulation? (y/n): ")
+        self.condition = "n"
 
         if self.condition == 'y':
             print("Simulation mode")
@@ -31,8 +36,8 @@ class WalkingNode:
             }
         elif self.condition == 'n':
             self.publishers = {
-                'left_leg_pub': rospy.Publisher('/marta/left_leg/command', Int16MultiArray, queue_size=10),
-                'right_leg_pub': rospy.Publisher('/marta/right_leg/command', Int16MultiArray, queue_size=10),
+                'left_leg_pub': rospy.Publisher('/marta/left_leg/command', Float64MultiArray, queue_size=10),
+                'right_leg_pub': rospy.Publisher('/marta/right_leg/command', Float64MultiArray, queue_size=10),
             }
 
         # Subscrição para receber as coordenadas das pernas
@@ -85,14 +90,14 @@ class WalkingNode:
             self.publishers['hip_yaw_right'].publish(right_leg['hip_yaw'])
         
         elif self.condition == 'n':
-            left_leg_msg = Int16MultiArray()
-            left_leg_msg.data = [int(10 * left_leg['hip_yaw']), int(10 * left_leg['hip_roll']), 
-                                 int(10 * left_leg['hip_pitch']), int(10 * left_leg['knee_pitch']), 
-                                 int(10 * left_leg['ankle_pitch']), int(10 * left_leg['ankle_roll'])]
-            right_leg_msg = Int16MultiArray()
-            right_leg_msg.data = [int(10 * right_leg['hip_yaw']), int(10 * right_leg['hip_roll']), 
-                                  int(10 * right_leg['hip_pitch']), int(10 * right_leg['knee_pitch']), 
-                                  int(10 * right_leg['ankle_pitch']), int(10 * right_leg['ankle_roll'])]
+            left_leg_msg = Float64MultiArray()
+            left_leg_msg.data = [ left_leg['hip_yaw'],  left_leg['hip_roll'], 
+                                  left_leg['hip_pitch'],  left_leg['knee_pitch'], 
+                                  left_leg['ankle_pitch'],  left_leg['ankle_roll']]
+            right_leg_msg = Float64MultiArray()
+            right_leg_msg.data = [ right_leg['hip_yaw'],  right_leg['hip_roll'], 
+                                   right_leg['hip_pitch'],  right_leg['knee_pitch'], 
+                                   right_leg['ankle_pitch'],  right_leg['ankle_roll']]
             
             self.publishers['left_leg_pub'].publish(left_leg_msg)
             self.publishers['right_leg_pub'].publish(right_leg_msg)
@@ -101,7 +106,8 @@ class WalkingNode:
         print("right_leg_angles: ", right_leg)
 
     def spin(self):
-        rospy.spin()
+        while not rospy.is_shutdown():
+            rospy.sleep(0.01)  # Intervalo para atingir a frequência de 100 Hz
 
     def load_physical_parameters(self):
         # Carregar os parâmetros do servidor de parâmetros ROS

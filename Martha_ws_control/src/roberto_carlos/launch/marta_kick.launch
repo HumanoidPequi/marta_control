@@ -1,0 +1,11 @@
+<launch>
+    
+    <node name="serial_node" pkg="rosserial_python" type="serial_node.py" output="screen" args="_port:=/dev/ttyACM0 _baud:=1000000"/>
+
+    <node name="inverse_kinematics_node" pkg="martha_inverse_kinematics" type="inverseKinematics_node.py" output="screen"/>
+
+    <node name="coordinates_publisher" pkg="roberto_carlos" type="kick.py" output="screen"/>
+
+    <rosparam file="$(find walking_parameters)/config/params.yaml" command="load" />
+
+</launch>
