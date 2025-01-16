@@ -1,0 +1,76 @@
+#!usr/bin/env python3
+# -*- coding: utf-8 -*-
+import math
+from utils import *
+
+class InverseKinematicsArms:
+    def __init__(self, physical_parameters):
+        self.upper_arm_length = physical_parameters['upper_arm_length']
+        self.lower_arm_length = physical_parameters['lower_arm_length']
+        self.shoulder_pitch0 = physical_parameters['shoulder_pitch0']
+        self.elbow_pitch0 = physical_parameters['elbow_pitch0']
+        self.torso_to_left_shoulder = physical_parameters['torso_to_left_shoulder']
+        self.joint_limits = physical_parameters.get('joint_limits', {})
+        self.math_utils = MathUtils()
+
+    def compute_joints_targets_one_arm(self, x, y, z):
+        yz = math.sqrt(y ** 2 + z ** 2)
+        c = math.sqrt(x ** 2 + y ** 2 + z ** 2)
+        a = self.upper_arm_length
+        b = self.lower_arm_length
+
+        if c > a + b:
+            return None
+
+        cos_gamma = (a ** 2 + b ** 2 - c ** 2) / (2.0 * a * b)
+        if not -1 <= cos_gamma <= 1:
+            return None
+
+        gamma = math.acos(cos_gamma)
+        beta = math.acos((a ** 2 + c ** 2 - b ** 2) / (2.0 * a * c))
+
+        shoulder_pitch = -(math.atan2(x, yz) + beta) - self.shoulder_pitch0
+        elbow_pitch = math.pi - gamma - self.elbow_pitch0
+
+        if z == 0:
+            shoulder_roll = math.pi / 2 if y > 0 else -math.pi / 2
+        else:
+            shoulder_roll = -math.atan(y / z)
+
+        shoulder_pitch = self.apply_joint_limits('shoulder_pitch', shoulder_pitch)
+        elbow_pitch = self.apply_joint_limits('elbow_pitch', elbow_pitch)
+        shoulder_roll = self.apply_joint_limits('shoulder_roll', shoulder_roll)
+
+        return {
+            'shoulder_pitch': shoulder_pitch,
+            'elbow_pitch': elbow_pitch,
+            'shoulder_roll': shoulder_roll
+        }
+
+    def compute_joints_targets(self, x_left, y_left, z_left, 
+                               x_right, y_right, z_right):
+        x_left -= self.torso_to_left_shoulder[0]
+        y_left -= self.torso_to_left_shoulder[1]
+        x_right -= self.torso_to_left_shoulder[0]
+        y_right += self.torso_to_left_shoulder[1]
+
+        z_left -= self.torso_to_left_shoulder[2]
+        z_right -= self.torso_to_left_shoulder[2]
+
+        left_arm = self.compute_joints_targets_one_arm(x_left, y_left, z_left)
+        right_arm = self.compute_joints_targets_one_arm(x_right, y_right, z_right)
+
+        if left_arm is None or right_arm is None:
+            return None
+
+        return {
+            'left_arm': left_arm,
+            'right_arm': right_arm
+        }
+
+    def apply_joint_limits(self, joint_name, angle):
+        limits = self.joint_limits.get(joint_name, None)
+        if limits:
+            min_limit, max_limit = limits
+            angle = max(min(angle, max_limit), min_limit)
+        return angle
