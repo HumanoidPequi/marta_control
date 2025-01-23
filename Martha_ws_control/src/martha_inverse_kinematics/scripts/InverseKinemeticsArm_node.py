@@ -16,11 +16,11 @@ class ArmControlNode:
             print("Simulation mode")
             # Publishers para os ângulos das articulações
             self.publishers = {
-                'shoulder_roll_left': rospy.Publisher('/marta/l_shoulder_roll_position/command', Float64, queue_size=10),
                 'shoulder_pitch_left': rospy.Publisher('/marta/l_shoulder_pitch_position/command', Float64, queue_size=10),
+                'shoulder_roll_left': rospy.Publisher('/marta/l_shoulder_roll_position/command', Float64, queue_size=10),
                 'elbow_pitch_left': rospy.Publisher('/marta/l_elbow_pitch_position/command', Float64, queue_size=10),
-                'shoulder_roll_right': rospy.Publisher('/marta/r_shoulder_roll_position/command', Float64, queue_size=10),
                 'shoulder_pitch_right': rospy.Publisher('/marta/r_shoulder_pitch_position/command', Float64, queue_size=10),
+                'shoulder_roll_right': rospy.Publisher('/marta/r_shoulder_roll_position/command', Float64, queue_size=10),
                 'elbow_pitch_right': rospy.Publisher('/marta/r_elbow_pitch_position/command', Float64, queue_size=10),
             }
         elif self.condition == 'n':
@@ -61,20 +61,20 @@ class ArmControlNode:
         right_arm = joints['right_arm']
 
         if self.condition == 'y':
-            self.publishers['shoulder_roll_left'].publish(left_arm['shoulder_roll'])
             self.publishers['shoulder_pitch_left'].publish(left_arm['shoulder_pitch'])
+            self.publishers['shoulder_roll_left'].publish(left_arm['shoulder_roll'])
             self.publishers['elbow_pitch_left'].publish(left_arm['elbow_pitch'])
 
             # Publicar os ângulos do braço direito
-            self.publishers['shoulder_roll_right'].publish(right_arm['shoulder_roll'])
             self.publishers['shoulder_pitch_right'].publish(right_arm['shoulder_pitch'])
+            self.publishers['shoulder_roll_right'].publish(right_arm['shoulder_roll'])
             self.publishers['elbow_pitch_right'].publish(right_arm['elbow_pitch'])
 
         elif self.condition == 'n':
             left_arm_msg = Float64MultiArray()
-            left_arm_msg.data = [0, 0,left_arm['shoulder_roll'], left_arm['shoulder_pitch'], left_arm['elbow_pitch']]
+            left_arm_msg.data = [0, 0,left_arm['shoulder_pitch'], left_arm['shoulder_roll'], left_arm['elbow_pitch']]
             right_arm_msg = Float64MultiArray()
-            right_arm_msg.data = [right_arm['shoulder_roll'], right_arm['shoulder_pitch'], right_arm['elbow_pitch']]
+            right_arm_msg.data = [right_arm['shoulder_pitch'], right_arm['shoulder_roll'], right_arm['elbow_pitch']]
 
             self.publishers['left_arm_pub'].publish(left_arm_msg)
             self.publishers['right_arm_pub'].publish(right_arm_msg)
@@ -88,10 +88,10 @@ class ArmControlNode:
     def load_physical_parameters(self):
         # Carregar os parâmetros do servidor de parâmetros ROS
         parameters = {
-            'upper_arm_length': rospy.get_param('/arm_params/upper_arm_length', 0.3),
-            'lower_arm_length': rospy.get_param('/arm_params/lower_arm_length', 0.25),
-            'shoulder_roll0': rospy.get_param('/arm_params/shoulder_roll0', 0.0),
+            'upper_arm_length': rospy.get_param('/arm_params/upper_arm_length', 0.1236),
+            'lower_arm_length': rospy.get_param('/arm_params/lower_arm_length', 0.1650),
             'shoulder_pitch0': rospy.get_param('/arm_params/shoulder_pitch0', 0.0),
+            'shoulder_roll0': rospy.get_param('/arm_params/shoulder_roll0', 0.0),
             'elbow_pitch0': rospy.get_param('/arm_params/elbow_pitch0', 0.0),
         }
         rospy.loginfo(f"Loaded physical parameters: {parameters}")

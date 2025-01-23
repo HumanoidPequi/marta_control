@@ -6,8 +6,8 @@ class ArmInverseKinematics:
     def __init__(self, physical_parameters):
         self.upper_arm_length = physical_parameters['upper_arm_length']
         self.lower_arm_length = physical_parameters['lower_arm_length']
-        self.shoulder_roll0 = physical_parameters['shoulder_roll0']
         self.shoulder_pitch0 = physical_parameters['shoulder_pitch0']
+        self.shoulder_roll0 = physical_parameters['shoulder_roll0']
         self.elbow_pitch0 = physical_parameters['elbow_pitch0']
 
     def compute_joint_targets_one_arm(self, x, y, z):
@@ -26,8 +26,8 @@ class ArmInverseKinematics:
         if c > a + b or c < abs(a - b):
             print("Posição alvo fora do alcance do braço.")
             return {
-                'shoulder_roll': 0,
                 'shoulder_pitch': 0,
+                'shoulder_roll': 0,
                 'elbow_pitch': 0
             }
 
@@ -36,17 +36,17 @@ class ArmInverseKinematics:
         beta = math.acos((a**2 + c**2 - b**2) / (2 * a * c))   # Ângulo do ombro
 
         # Ângulo de pitch do ombro
-        shoulder_pitch = math.atan2(z, math.sqrt(x**2 + y**2)) + beta - self.shoulder_pitch0
+        shoulder_roll = (math.atan2(z, math.sqrt(x**2 + y**2)) + beta - self.shoulder_roll0 + math.pi/2) * -1
 
-        # Ângulo de roll do ombro
-        shoulder_roll = math.atan2(y, x) - self.shoulder_roll0
+        # Ângulo de pitch do ombro
+        shoulder_pitch = math.atan2(y, x) - self.shoulder_pitch0
 
         # Ângulo de pitch do cotovelo
-        elbow_pitch = math.pi - gamma - self.elbow_pitch0 - math.pi/2
+        elbow_pitch = (math.pi - gamma - self.elbow_pitch0) * -1 
 
         return {
-            'shoulder_roll': shoulder_roll,
             'shoulder_pitch': shoulder_pitch,
+            'shoulder_roll': shoulder_roll,
             'elbow_pitch': elbow_pitch
         }
 
