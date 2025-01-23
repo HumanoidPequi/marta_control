@@ -4,7 +4,7 @@
 import rospy
 from std_msgs.msg import Float64, Float64MultiArray
 from sensor_msgs.msg import JointState
-from ArmInverseKinematics import ArmInverseKinematics
+from InverseKinemeticsArm import ArmInverseKinematics
 
 class ArmControlNode:
     def __init__(self):
@@ -16,17 +16,17 @@ class ArmControlNode:
             print("Simulation mode")
             # Publishers para os ângulos das articulações
             self.publishers = {
-                'shoulder_yaw_left': rospy.Publisher('/robot/l_shoulder_yaw_position/command', Float64, queue_size=10),
-                'shoulder_pitch_left': rospy.Publisher('/robot/l_shoulder_pitch_position/command', Float64, queue_size=10),
-                'elbow_pitch_left': rospy.Publisher('/robot/l_elbow_pitch_position/command', Float64, queue_size=10),
-                'shoulder_yaw_right': rospy.Publisher('/robot/r_shoulder_yaw_position/command', Float64, queue_size=10),
-                'shoulder_pitch_right': rospy.Publisher('/robot/r_shoulder_pitch_position/command', Float64, queue_size=10),
-                'elbow_pitch_right': rospy.Publisher('/robot/r_elbow_pitch_position/command', Float64, queue_size=10),
+                'shoulder_roll_left': rospy.Publisher('/marta/l_shoulder_roll_position/command', Float64, queue_size=10),
+                'shoulder_pitch_left': rospy.Publisher('/marta/l_shoulder_pitch_position/command', Float64, queue_size=10),
+                'elbow_pitch_left': rospy.Publisher('/marta/l_elbow_pitch_position/command', Float64, queue_size=10),
+                'shoulder_roll_right': rospy.Publisher('/marta/r_shoulder_roll_position/command', Float64, queue_size=10),
+                'shoulder_pitch_right': rospy.Publisher('/marta/r_shoulder_pitch_position/command', Float64, queue_size=10),
+                'elbow_pitch_right': rospy.Publisher('/marta/r_elbow_pitch_position/command', Float64, queue_size=10),
             }
         elif self.condition == 'n':
             self.publishers = {
-                'left_arm_pub': rospy.Publisher('/robot/left_arm/command', Float64MultiArray, queue_size=10),
-                'right_arm_pub': rospy.Publisher('/robot/right_arm/command', Float64MultiArray, queue_size=10),
+                'left_arm_pub': rospy.Publisher('/marta/arm_l_head/command', Float64MultiArray, queue_size=10),
+                'right_arm_pub': rospy.Publisher('/marta/arm_r/command', Float64MultiArray, queue_size=10),
             }
 
         # Subscrição para receber as coordenadas dos braços
@@ -61,20 +61,20 @@ class ArmControlNode:
         right_arm = joints['right_arm']
 
         if self.condition == 'y':
-            self.publishers['shoulder_yaw_left'].publish(left_arm['shoulder_yaw'])
+            self.publishers['shoulder_roll_left'].publish(left_arm['shoulder_roll'])
             self.publishers['shoulder_pitch_left'].publish(left_arm['shoulder_pitch'])
             self.publishers['elbow_pitch_left'].publish(left_arm['elbow_pitch'])
 
             # Publicar os ângulos do braço direito
-            self.publishers['shoulder_yaw_right'].publish(right_arm['shoulder_yaw'])
+            self.publishers['shoulder_roll_right'].publish(right_arm['shoulder_roll'])
             self.publishers['shoulder_pitch_right'].publish(right_arm['shoulder_pitch'])
             self.publishers['elbow_pitch_right'].publish(right_arm['elbow_pitch'])
 
         elif self.condition == 'n':
             left_arm_msg = Float64MultiArray()
-            left_arm_msg.data = [left_arm['shoulder_yaw'], left_arm['shoulder_pitch'], left_arm['elbow_pitch']]
+            left_arm_msg.data = [0, 0,left_arm['shoulder_roll'], left_arm['shoulder_pitch'], left_arm['elbow_pitch']]
             right_arm_msg = Float64MultiArray()
-            right_arm_msg.data = [right_arm['shoulder_yaw'], right_arm['shoulder_pitch'], right_arm['elbow_pitch']]
+            right_arm_msg.data = [right_arm['shoulder_roll'], right_arm['shoulder_pitch'], right_arm['elbow_pitch']]
 
             self.publishers['left_arm_pub'].publish(left_arm_msg)
             self.publishers['right_arm_pub'].publish(right_arm_msg)
@@ -90,7 +90,7 @@ class ArmControlNode:
         parameters = {
             'upper_arm_length': rospy.get_param('/arm_params/upper_arm_length', 0.3),
             'lower_arm_length': rospy.get_param('/arm_params/lower_arm_length', 0.25),
-            'shoulder_yaw0': rospy.get_param('/arm_params/shoulder_yaw0', 0.0),
+            'shoulder_roll0': rospy.get_param('/arm_params/shoulder_roll0', 0.0),
             'shoulder_pitch0': rospy.get_param('/arm_params/shoulder_pitch0', 0.0),
             'elbow_pitch0': rospy.get_param('/arm_params/elbow_pitch0', 0.0),
         }
