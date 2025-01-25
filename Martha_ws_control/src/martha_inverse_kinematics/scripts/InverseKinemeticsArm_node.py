@@ -88,8 +88,8 @@ class ArmControlNode:
     def load_physical_parameters(self):
         # Carregar os parâmetros do servidor de parâmetros ROS
         parameters = {
-            'upper_arm_length': rospy.get_param('/arm_params/upper_arm_length', 0.1236),
-            'lower_arm_length': rospy.get_param('/arm_params/lower_arm_length', 0.1650),
+            'upper_arm_length': rospy.get_param('/arm_params/upper_arm_length', 0.1136),
+            'lower_arm_length': rospy.get_param('/arm_params/lower_arm_length', 0.1550),
             'shoulder_pitch0': rospy.get_param('/arm_params/shoulder_pitch0', 0.0),
             'shoulder_roll0': rospy.get_param('/arm_params/shoulder_roll0', 0.0),
             'elbow_pitch0': rospy.get_param('/arm_params/elbow_pitch0', 0.0),

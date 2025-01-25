@@ -36,11 +36,10 @@ class ArmInverseKinematics:
         beta = math.acos((a**2 + c**2 - b**2) / (2 * a * c))   # Ângulo do ombro
 
         # Ângulo de pitch do ombro
-        shoulder_roll = (math.atan2(z, math.sqrt(x**2 + y**2)) + beta - self.shoulder_roll0 + math.pi/2) * -1
-
+        shoulder_roll = (math.atan2(y, x) - self.shoulder_roll0) * -1
         # Ângulo de pitch do ombro
-        shoulder_pitch = math.atan2(y, x) - self.shoulder_pitch0
-
+        shoulder_pitch = (math.atan2( math.sqrt(x**2 + y**2), z) + beta - self.shoulder_pitch0 )-math.pi
+        
         # Ângulo de pitch do cotovelo
         elbow_pitch = (math.pi - gamma - self.elbow_pitch0) * -1 
 

@@ -10,7 +10,7 @@ import tty
 
 # Instruções para o usuário
 instructions = """
-Controle das pernas:
+Controle das pernas e braços:
 ---------------------------
 Perna Esquerda:
   w : aumentar x
@@ -28,21 +28,35 @@ Perna Direita:
   k : aumentar z
   , : diminuir z
 
+Braço Esquerdo:
+  1 : aumentar x
+  2 : aumentar y
+  3 : aumentar z
+Braço Direito:
+  7 : aumentar x
+  8 : aumentar y
+  9 : aumentar z
+Para os bracos, apertar '-' para inverter o sentido
+
 Pressione Esc para sair
 """
 
 # Incremento para ajustar as coordenadas
 STEP_SIZE = 0.001
 
-class TeleopLegControl:
+
+class TeleopLegArmControl:
     def __init__(self):
-        rospy.init_node('teleop_leg_control')
+        rospy.init_node('teleop_leg_arm_control')
+        self.DIRECTION = 1
 
         # Posições iniciais
-        self.position = [-0.013, -0.032, -0.255, 0, -0.013, 0.032, -0.255, 0]
+        self.leg_position = [-0.013, -0.032, -0.255, 0, -0.013, 0.032, -0.255, 0]
+        self.arm_position = [0.0, 0.0, -0.269, 0.0, 0.0, -0.269]
 
-        # Publisher para enviar as coordenadas
-        self.publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
+        # Publishers para enviar as coordenadas
+        self.leg_publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
+        self.arm_publisher = rospy.Publisher('/arm_coordinates_input', JointState, queue_size=10)
 
         # Configuração do terminal para leitura de teclas
         self.settings = termios.tcgetattr(sys.stdin)
@@ -67,41 +81,62 @@ class TeleopLegControl:
 
                 # Controles para a perna esquerda
                 if key == 'w':
-                    self.position[0] += STEP_SIZE  # Aumenta x
+                    self.leg_position[0] += STEP_SIZE  # Aumenta x
                 elif key == 'x':
-                    self.position[0] -= STEP_SIZE  # Diminui x
+                    self.leg_position[0] -= STEP_SIZE  # Diminui x
                 elif key == 'a':
-                    self.position[1] += STEP_SIZE  # Aumenta y
+                    self.leg_position[1] += STEP_SIZE  # Aumenta y
                 elif key == 'd':
-                    self.position[1] -= STEP_SIZE  # Diminui y
+                    self.leg_position[1] -= STEP_SIZE  # Diminui y
                 elif key == 's':
-                    self.position[2] += STEP_SIZE  # Aumenta z
+                    self.leg_position[2] += STEP_SIZE  # Aumenta z
                 elif key == 'c':
-                    self.position[2] -= STEP_SIZE  # Diminui z
+                    self.leg_position[2] -= STEP_SIZE  # Diminui z
 
                 # Controles para a perna direita
                 elif key == 'i':
-                    self.position[4] += STEP_SIZE  # Aumenta x
+                    self.leg_position[4] += STEP_SIZE  # Aumenta x
                 elif key == 'm':
-                    self.position[4] -= STEP_SIZE  # Diminui x
+                    self.leg_position[4] -= STEP_SIZE  # Diminui x
                 elif key == 'j':
-                    self.position[5] += STEP_SIZE  # Aumenta y
+                    self.leg_position[5] += STEP_SIZE  # Aumenta y
                 elif key == 'l':
-                    self.position[5] -= STEP_SIZE  # Diminui y
+                    self.leg_position[5] -= STEP_SIZE  # Diminui y
                 elif key == 'k':
-                    self.position[6] += STEP_SIZE  # Aumenta z
+                    self.leg_position[6] += STEP_SIZE  # Aumenta z
                 elif key == ',':
-                    self.position[6] -= STEP_SIZE  # Diminui z
+                    self.leg_position[6] -= STEP_SIZE  # Diminui z
 
-                # Publica a nova posição
-                msg = JointState()
-                msg.position = self.position
+                # Controles para o braço esquerdo
+                elif key == '1':
+                    self.arm_position[0] += STEP_SIZE * self.DIRECTION # Aumenta x
+                elif key == '2':
+                    self.arm_position[1] += STEP_SIZE * self.DIRECTION # Aumenta y
+                elif key == '3':
+                    self.arm_position[2] += STEP_SIZE * self.DIRECTION # Aumenta z
 
-                rospy.loginfo("[ %.4f, %.4f, %.4f, %.4f,  %.4f, %.4f, %.4f, %.4f]", msg.position[0], msg.position[1], msg.position[2], msg.position[3], msg.position[4], msg.position[5], msg.position[6], msg.position[7])
-            
-                self.publisher.publish(msg)
+                # Controles para o braço direito
+                elif key == '7':
+                    self.arm_position[3] += STEP_SIZE * self.DIRECTION # Aumenta x
+                elif key == '8':
+                    self.arm_position[4] += STEP_SIZE * self.DIRECTION # Aumenta y
+                elif key == '9':
+                    self.arm_position[5] += STEP_SIZE * self.DIRECTION # Aumenta z
+                    
+                if key == '-':
+                    self.DIRECTION *= -1
 
-                #rospy.loginfo(f"Nova posição: {self.position}")
+                # Publica a nova posição das pernas
+                leg_msg = JointState()
+                leg_msg.position = self.leg_position
+                rospy.loginfo("Leg: [ %.4f, %.4f, %.4f, %.4f,  %.4f, %.4f, %.4f, %.4f]", *self.leg_position)
+                self.leg_publisher.publish(leg_msg)
+
+                # Publica a nova posição dos braços
+                arm_msg = JointState()
+                arm_msg.position = self.arm_position
+                rospy.loginfo("Arm: [ %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]", *self.arm_position)
+                self.arm_publisher.publish(arm_msg)
 
         except Exception as e:
             print(e)
@@ -113,7 +148,7 @@ class TeleopLegControl:
 
 if __name__ == '__main__':
     try:
-        teleop = TeleopLegControl()
+        teleop = TeleopLegArmControl()
         teleop.run()
     except rospy.ROSInterruptException:
         pass
