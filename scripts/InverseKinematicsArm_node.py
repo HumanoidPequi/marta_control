@@ -1,0 +1,105 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+import rospy
+from std_msgs.msg import Float64, Float64MultiArray
+from sensor_msgs.msg import JointState
+from InverseKinemeticsArm import ArmInverseKinematics
+
+class ArmControlNode:
+    def __init__(self):
+        # Inicializa o nó ROS
+        rospy.init_node('arm_inverse_kinematics_node')
+        self.condition = input("Are you using the simulation? (y/n): ")
+
+        if self.condition == 'y':
+            print("Simulation mode")
+            # Publishers para os ângulos das articulações
+            self.publishers = {
+                'shoulder_pitch_left': rospy.Publisher('/marta/l_shoulder_pitch_position/command', Float64, queue_size=10),
+                'shoulder_roll_left': rospy.Publisher('/marta/l_shoulder_roll_position/command', Float64, queue_size=10),
+                'elbow_pitch_left': rospy.Publisher('/marta/l_elbow_pitch_position/command', Float64, queue_size=10),
+                'shoulder_pitch_right': rospy.Publisher('/marta/r_shoulder_pitch_position/command', Float64, queue_size=10),
+                'shoulder_roll_right': rospy.Publisher('/marta/r_shoulder_roll_position/command', Float64, queue_size=10),
+                'elbow_pitch_right': rospy.Publisher('/marta/r_elbow_pitch_position/command', Float64, queue_size=10),
+            }
+        elif self.condition == 'n':
+            self.publishers = {
+                'left_arm_pub': rospy.Publisher('/marta/arm_l_head/command', Float64MultiArray, queue_size=10),
+                'right_arm_pub': rospy.Publisher('/marta/arm_r/command', Float64MultiArray, queue_size=10),
+            }
+
+        # Subscrição para receber as coordenadas dos braços
+        rospy.Subscriber('/arm_coordinates_input', JointState, self.coordinates_callback)
+
+        # Parâmetros físicos do robô carregados do servidor de parâmetros ROS
+        self.physical_parameters = self.load_physical_parameters()
+
+        # Inicializa a cinemática inversa
+        self.inverse_kinematics = ArmInverseKinematics(self.physical_parameters)
+
+    def coordinates_callback(self, msg):
+        # Receber as coordenadas dos braços
+        x_left = msg.position[0]
+        y_left = msg.position[1]
+        z_left = msg.position[2]
+
+        x_right = msg.position[3]
+        y_right = msg.position[4]
+        z_right = msg.position[5]
+
+        # Calcular os ângulos das articulações usando a cinemática inversa
+        joints = self.inverse_kinematics.compute_joint_targets(x_left, y_left, z_left, 
+                                                               x_right, y_right, z_right)
+
+        # Publicar os ângulos calculados nos tópicos corretos
+        self.publish_angles(joints)
+
+    def publish_angles(self, joints):
+        # Publicar os ângulos do braço esquerdo
+        left_arm = joints['left_arm']
+        right_arm = joints['right_arm']
+
+        if self.condition == 'y':
+            self.publishers['shoulder_pitch_left'].publish(left_arm['shoulder_pitch'])
+            self.publishers['shoulder_roll_left'].publish(left_arm['shoulder_roll'])
+            self.publishers['elbow_pitch_left'].publish(left_arm['elbow_pitch'])
+
+            # Publicar os ângulos do braço direito
+            self.publishers['shoulder_pitch_right'].publish(right_arm['shoulder_pitch'])
+            self.publishers['shoulder_roll_right'].publish(right_arm['shoulder_roll'])
+            self.publishers['elbow_pitch_right'].publish(right_arm['elbow_pitch'])
+
+        elif self.condition == 'n':
+            left_arm_msg = Float64MultiArray()
+            left_arm_msg.data = [0, 0,left_arm['shoulder_pitch'], left_arm['shoulder_roll'], left_arm['elbow_pitch']]
+            right_arm_msg = Float64MultiArray()
+            right_arm_msg.data = [right_arm['shoulder_pitch'], right_arm['shoulder_roll'], right_arm['elbow_pitch']]
+
+            self.publishers['left_arm_pub'].publish(left_arm_msg)
+            self.publishers['right_arm_pub'].publish(right_arm_msg)
+
+        print("left_arm_angles: ", left_arm)
+        print("right_arm_angles: ", right_arm)
+
+    def spin(self):
+        rospy.spin()
+
+    def load_physical_parameters(self):
+        # Carregar os parâmetros do servidor de parâmetros ROS
+        parameters = {
+            'upper_arm_length': rospy.get_param('/arm_params/upper_arm_length', 0.1136),
+            'lower_arm_length': rospy.get_param('/arm_params/lower_arm_length', 0.1550),
+            'shoulder_pitch0': rospy.get_param('/arm_params/shoulder_pitch0', 0.0),
+            'shoulder_roll0': rospy.get_param('/arm_params/shoulder_roll0', 0.0),
+            'elbow_pitch0': rospy.get_param('/arm_params/elbow_pitch0', 0.0),
+        }
+        rospy.loginfo(f"Loaded physical parameters: {parameters}")
+        return parameters
+
+if __name__ == '__main__':
+    try:
+        node = ArmControlNode()
+        node.spin()
+    except rospy.ROSInterruptException:
+        pass
