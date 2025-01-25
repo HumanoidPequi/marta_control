@@ -44,6 +44,7 @@ Pressione Esc para sair
 # Incremento para ajustar as coordenadas
 STEP_SIZE = 0.001
 
+# arm: 0.1590, 0.0000, -0.2160, 0.1590, 0.0000, -0.2160
 
 class TeleopLegArmControl:
     def __init__(self):
@@ -51,8 +52,10 @@ class TeleopLegArmControl:
         self.DIRECTION = 1
 
         # Posições iniciais
-        self.leg_position = [-0.013, -0.032, -0.255, 0, -0.013, 0.032, -0.255, 0]
-        self.arm_position = [0.0, 0.0, -0.269, 0.0, 0.0, -0.269]
+        #self.leg_position = [0.02, 0.0475, -0.2535, 0.0, 0.02, -0.0475, -0.2535, 0.0]
+        #self.arm_position = [0.0, 0.0, -0.269, 0.0, 0.0, -0.269]
+        self.leg_position = [0.1130, 0.0475, -0.1395, 0.0000,  0.1140, -0.0475, -0.1395, 0.0000]
+        self.arm_position = [0.1590, 0.0000, -0.2160, 0.1590, 0.0000, -0.2160]
 
         # Publishers para enviar as coordenadas
         self.leg_publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
