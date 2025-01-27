@@ -10,7 +10,6 @@ project(marta_control)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
-  tf
 )
 
 ## System dependencies are found with CMake's conventions
@@ -192,8 +191,7 @@ include_directories(
 #   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 # )
 
-add_executable(joint_to_tf_publisher scripts/joint_to_tf_publisher.cpp)
-target_link_libraries(joint_to_tf_publisher ${catkin_LIBRARIES})
+
 
 
 

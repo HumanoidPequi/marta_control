@@ -7,8 +7,8 @@ def publish_coordinates(coordinates_matrix, delays):
     pub_leg = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
     pub_arm = rospy.Publisher('/arm_coordinates_input', JointState, queue_size=10)
     rospy.init_node('coordinates_publisher', anonymous=True)
-    msg_leg = JointState()
-    msg_arm = JointState()
+    msg = JointState()
+    # msg_arm = JointState()
     rate = 100
     steps = []
     for delay in delays:
@@ -27,19 +27,13 @@ def publish_coordinates(coordinates_matrix, delays):
                 position_interpolated = [
                     position_buffered[k] + (position[k] - position_buffered[k]) * (j/steps[i]) for k in range(len(position))
                 ]
-                msg_leg.position = position_interpolated[0:8]
-                pub_leg.publish(msg_leg)
-                msg_arm.position = position_interpolated[8:15]
+                msg.position = position_interpolated
+                pub_leg.publish(msg)
+                # msg_arm.position = position_interpolated[8:15]
                 rospy.loginfo(f"Publicando: {position_interpolated}")
-                pub_arm.publish(msg_arm)
+                pub_arm.publish(msg)
                 rospy.sleep(1/rate)
             position_buffered = position
-        if i == 0:
-            msg_leg.position = position[0:8]
-            pub_leg.publish(msg_leg)
-            msg_arm.position = position[8:15]
-            rospy.loginfo(f"Publicando: {position}")
-            pub_arm.publish(msg_arm)
 
         # Aplica o atraso correspondente
         rospy.sleep(delays[i])

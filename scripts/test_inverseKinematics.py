@@ -1,6 +1,6 @@
 #!usr/bin/env python3
 # -*- coding: utf-8 -*-
-from InverseKinematics import InverseKinematics
+from marta_control.scripts.InverseKinematicsLeg import InverseKinematics
 
 # Definindo os parâmetros físicos do robô
 physical_parameters = {
