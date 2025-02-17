@@ -16,19 +16,19 @@ class WalkingNode:
         self.rate = rospy.Rate(100)  # 10 Hz
 
 
-        # self.publishers = {
-        #     'left_leg_pub': rospy.Publisher('/marta/left_leg/command', Float64MultiArray, queue_size=10),
-        #     'right_leg_pub': rospy.Publisher('/marta/right_leg/command', Float64MultiArray, queue_size=10),
-        #     'left_arm_pub': rospy.Publisher('/marta/arm_l_head/command', Float64MultiArray, queue_size=10),
-        #     'right_arm_pub': rospy.Publisher('/marta/arm_r/command', Float64MultiArray, queue_size=10)
-        # }
-
         self.publishers = {
-            'left_leg_pub': rospy.Publisher('/marta/left_leg/state', Float64MultiArray, queue_size=10),
-            'right_leg_pub': rospy.Publisher('/marta/right_leg/state', Float64MultiArray, queue_size=10),
-            'left_arm_pub': rospy.Publisher('/marta/arm_l_head/state', Float64MultiArray, queue_size=10),
-            'right_arm_pub': rospy.Publisher('/marta/arm_r/state', Float64MultiArray, queue_size=10)
+            'left_leg_pub': rospy.Publisher('/marta/left_leg/command', Float64MultiArray, queue_size=10),
+            'right_leg_pub': rospy.Publisher('/marta/right_leg/command', Float64MultiArray, queue_size=10),
+            'left_arm_pub': rospy.Publisher('/marta/arm_l_head/command', Float64MultiArray, queue_size=10),
+            'right_arm_pub': rospy.Publisher('/marta/arm_r/command', Float64MultiArray, queue_size=10)
         }
+
+        # self.publishers = {
+        #     'left_leg_pub': rospy.Publisher('/marta/left_leg/state', Float64MultiArray, queue_size=10),
+        #     'right_leg_pub': rospy.Publisher('/marta/right_leg/state', Float64MultiArray, queue_size=10),
+        #     'left_arm_pub': rospy.Publisher('/marta/arm_l_head/state', Float64MultiArray, queue_size=10),
+        #     'right_arm_pub': rospy.Publisher('/marta/arm_r/state', Float64MultiArray, queue_size=10)
+        # }
 
         # Subscrição para receber as coordenadas das pernas
         rospy.Subscriber('/coordinates_input', JointState, self.coordinates_callback)
