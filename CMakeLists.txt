@@ -10,6 +10,9 @@ project(marta_control)
 find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
+  tf2
+  tf2_ros
+  urdf
 )
 
 ## System dependencies are found with CMake's conventions
@@ -191,9 +194,8 @@ include_directories(
 #   DESTINATION ${CATKIN_PACKAGE_SHARE_DESTINATION}
 # )
 
-
-
-
+add_executable(tf_to_cm include/tf_to_cm.cpp)
+target_link_libraries(tf_to_cm ${catkin_LIBRARIES})
 
 #############
 ## Testing ##
