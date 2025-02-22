@@ -44,22 +44,24 @@ Pressione Esc para sair
 # Incremento para ajustar as coordenadas
 STEP_SIZE = 0.001
 
-# arm: 0.1590, 0.0000, -0.2160, 0.1590, 0.0000, -0.2160
 
 class TeleopLegArmControl:
     def __init__(self):
         rospy.init_node('teleop_leg_arm_control')
         self.DIRECTION = 1
 
-        # Posições iniciais
-        #self.leg_position = [0.02, 0.0475, -0.2535, 0.0, 0.02, -0.0475, -0.2535, 0.0]
-        #self.arm_position = [0.0, 0.0, -0.269, 0.0, 0.0, -0.269]
-        self.leg_position = [0.1130, 0.0475, -0.1395, 0.0000,  0.1140, -0.0475, -0.1395, 0.0000]
-        self.arm_position = [0.1590, 0.0000, -0.2160, 0.1590, 0.0000, -0.2160]
+        # [0.02, 0.0485, 0.08999999999999986, 0.0, 0.018, -0.04850000000000007, 0.1454999999999999, 0.0, 0.0, 0.0, -0.269, 0.0, 0.0, -0.269]
 
-        # Publishers para enviar as coordenadas
-        self.leg_publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
-        self.arm_publisher = rospy.Publisher('/arm_coordinates_input', JointState, queue_size=10)
+        # pos_init = [0, 0.0945, -0.1455, 0.0000,  0.0280, -0.1115, -0.1415, 0.0000, 0.0, 0.0, -0.269, 0.0, 0.0, -0.269]
+        pos_init = [-0.013, -0.032, -0.255, 0, -0.013, 0.032, -0.255, 0, 0.0, 0.000, -0.2690, 0.0, 0.000, -0.2690] 
+        # ['0.012', '-0.032', '-0.146', '0.000', '0.012', '0.032', '-0.146', '0.000', '0.237', '0.000', '-0.126', '0.000', '0.000', '-0.233'] ultima posicao
+
+        # Posições iniciais ajustadas
+        self.leg_position = pos_init[0:8]
+        self.arm_position = pos_init[8:14]
+
+        # Publisher combinado para pernas e braços
+        self.coordinate_publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
 
         # Configuração do terminal para leitura de teclas
         self.settings = termios.tcgetattr(sys.stdin)
@@ -112,34 +114,33 @@ class TeleopLegArmControl:
 
                 # Controles para o braço esquerdo
                 elif key == '1':
-                    self.arm_position[0] += STEP_SIZE * self.DIRECTION # Aumenta x
+                    self.arm_position[0] += STEP_SIZE * self.DIRECTION  # Aumenta x
                 elif key == '2':
-                    self.arm_position[1] += STEP_SIZE * self.DIRECTION # Aumenta y
+                    self.arm_position[1] += STEP_SIZE * self.DIRECTION  # Aumenta y
                 elif key == '3':
-                    self.arm_position[2] += STEP_SIZE * self.DIRECTION # Aumenta z
+                    self.arm_position[2] += STEP_SIZE * self.DIRECTION  # Aumenta z
 
                 # Controles para o braço direito
                 elif key == '7':
-                    self.arm_position[3] += STEP_SIZE * self.DIRECTION # Aumenta x
+                    self.arm_position[3] += STEP_SIZE * self.DIRECTION  # Aumenta x
                 elif key == '8':
-                    self.arm_position[4] += STEP_SIZE * self.DIRECTION # Aumenta y
+                    self.arm_position[4] += STEP_SIZE * self.DIRECTION  # Aumenta y
                 elif key == '9':
-                    self.arm_position[5] += STEP_SIZE * self.DIRECTION # Aumenta z
-                    
+                    self.arm_position[5] += STEP_SIZE * self.DIRECTION  # Aumenta z
+
                 if key == '-':
                     self.DIRECTION *= -1
 
-                # Publica a nova posição das pernas
-                leg_msg = JointState()
-                leg_msg.position = self.leg_position
-                rospy.loginfo("Leg: [ %.4f, %.4f, %.4f, %.4f,  %.4f, %.4f, %.4f, %.4f]", *self.leg_position)
-                self.leg_publisher.publish(leg_msg)
+                # Publica as novas posições das pernas e braços combinadas
+                combined_position = self.leg_position + self.arm_position
+                msg = JointState()
+                msg.position = combined_position
 
-                # Publica a nova posição dos braços
-                arm_msg = JointState()
-                arm_msg.position = self.arm_position
-                rospy.loginfo("Arm: [ %.4f, %.4f, %.4f, %.4f, %.4f, %.4f]", *self.arm_position)
-                self.arm_publisher.publish(arm_msg)
+                # Formatar as posições com 3 casas decimais
+                formatted_position = [f"{pos:.3f}" for pos in combined_position]
+                # rospy.loginfo("Combined: %s", formatted_position)
+                print(f"Combined: {formatted_position}")
+                self.coordinate_publisher.publish(msg)
 
         except Exception as e:
             print(e)
@@ -148,6 +149,7 @@ class TeleopLegArmControl:
             # Restaura as configurações do terminal
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
             print("Teleop encerrado.")
+
 
 if __name__ == '__main__':
     try:

@@ -1,9 +1,9 @@
 #!usr/bin/env python3
 # -*- coding: utf-8 -*-
 import math
-from utils import *
 
-class InverseKinematics:
+
+class LegInverseKinematics:
     def __init__(self, physical_parameters):
         self.upper_leg_length = physical_parameters['upper_leg_length']
         self.lower_leg_length = physical_parameters['lower_leg_length']
@@ -12,7 +12,6 @@ class InverseKinematics:
         self.ankle_pitch0 = physical_parameters['ankle_pitch0']
         self.torso_to_left_hip = physical_parameters['torso_to_left_hip']
         self.left_ankle_to_left_foot = physical_parameters['left_ankle_to_left_foot']
-        self.math_utils = MathUtils()
 
     def compute_joints_targets_one_leg(self, x, y, z, theta):
         # Distância no plano yz
@@ -44,12 +43,9 @@ class InverseKinematics:
         beta = math.acos((a ** 2 + c ** 2 - b ** 2) / (2.0 * a * c))   # Ângulo do quadril
         alpha = math.acos((b ** 2 + c ** 2 - a ** 2) / (2.0 * b * c))  # Ângulo do tornozelo
 
-        # gamma = self.math_utils.normalize_angle_radians(gamma)
-        # beta = self.math_utils.normalize_angle_radians(beta)
-        # alpha = self.math_utils.normalize_angle_radians(alpha)
 
-        print(" alpha = ", alpha, ", beta = ", beta, ", gamma = ", gamma)
-        print("x = ", x," y = ", y, " z = ", z)
+        # print(" alpha = ", alpha, ", beta = ", beta, ", gamma = ", gamma)
+        # print("x = ", x," y = ", y, " z = ", z)
 
         # Ajustar os ângulos para os ângulos base do robô
         hip_pitch = -(math.atan2(x, yz) + beta) - self.hip_pitch0
