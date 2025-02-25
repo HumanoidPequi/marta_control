@@ -3,6 +3,7 @@
 
 import rospy
 from sensor_msgs.msg import JointState
+from visualization_msgs.msg import Marker
 import sys
 import select
 import termios
@@ -44,20 +45,19 @@ Pressione Esc para sair
 # Incremento para ajustar as coordenadas
 STEP_SIZE = 0.001
 
-
 class TeleopLegArmControl:
     def __init__(self):
         rospy.init_node('teleop_leg_arm_control')
         self.DIRECTION = 1
 
-        # [0.02, 0.0485, 0.08999999999999986, 0.0, 0.018, -0.04850000000000007, 0.1454999999999999, 0.0, 0.0, 0.0, -0.269, 0.0, 0.0, -0.269]
-
-        # Posições iniciais ajustadas
-        self.leg_position = [-0.0130, -0.0320, -0.2550, 0.0000,  -0.0130, 0.0320, -0.2550, 0.0000]
+        # Posições iniciais ajustadas para as pernas e braços
+        self.leg_position = [0.007, 0.040, -0.341, 0.0000,  0.007, -0.040, -0.341, 0.0000]
         self.arm_position = [0.0, 0.0, -0.269, 0.0, 0.0, -0.269]
 
-        # Publisher combinado para pernas e braços
+        # Publisher para as coordenadas combinadas (joints)
         self.coordinate_publisher = rospy.Publisher('/coordinates_input', JointState, queue_size=10)
+        # Publisher para os markers que serão exibidos no RViz
+        self.marker_pub = rospy.Publisher('visualization_marker', Marker, queue_size=10)
 
         # Configuração do terminal para leitura de teclas
         self.settings = termios.tcgetattr(sys.stdin)
@@ -127,25 +127,69 @@ class TeleopLegArmControl:
                 if key == '-':
                     self.DIRECTION *= -1
 
-                # Publica as novas posições das pernas e braços combinadas
+                # Publica as novas posições combinadas
                 combined_position = self.leg_position + self.arm_position
-                msg = JointState()
-                msg.position = combined_position
+                joint_msg = JointState()
+                joint_msg.position = combined_position
+                print("Combined:", [f"{pos:.3f}" for pos in combined_position])
+                self.coordinate_publisher.publish(joint_msg)
 
-                # Formatar as posições com 3 casas decimais
-                formatted_position = [f"{pos:.3f}" for pos in combined_position]
-                # rospy.loginfo("Combined: %s", formatted_position)
-                print(f"Combined: {formatted_position}")
-                self.coordinate_publisher.publish(msg)
+                # Cria e publica marker para a perna esquerda
+                marker_left = Marker()
+                marker_left.header.frame_id = "base_link"  # Ajuste o frame conforme sua configuração
+                marker_left.header.stamp = rospy.Time.now()
+                marker_left.ns = "teleop_point_left"
+                marker_left.id = 0
+                marker_left.type = Marker.SPHERE
+                marker_left.action = Marker.ADD
+                marker_left.pose.position.x = self.leg_position[0]
+                marker_left.pose.position.y = self.leg_position[1]
+                marker_left.pose.position.z = self.leg_position[2]
+                marker_left.pose.orientation.x = 0.0
+                marker_left.pose.orientation.y = 0.0
+                marker_left.pose.orientation.z = 0.0
+                marker_left.pose.orientation.w = 1.0
+                marker_left.scale.x = 0.005
+                marker_left.scale.y = 0.005
+                marker_left.scale.z = 0.005
+                marker_left.color.a = 1.0  # Totalmente opaco
+                marker_left.color.r = 1.0
+                marker_left.color.g = 0.0
+                marker_left.color.b = 0.0  # Vermelho
+
+                # Cria e publica marker para a perna direita
+                marker_right = Marker()
+                marker_right.header.frame_id = "base_link"  # Ajuste o frame conforme sua configuração
+                marker_right.header.stamp = rospy.Time.now()
+                marker_right.ns = "teleop_point_right"
+                marker_right.id = 1
+                marker_right.type = Marker.SPHERE
+                marker_right.action = Marker.ADD
+                marker_right.pose.position.x = self.leg_position[4]
+                marker_right.pose.position.y = self.leg_position[5]
+                marker_right.pose.position.z = self.leg_position[6]
+                marker_right.pose.orientation.x = 0.0
+                marker_right.pose.orientation.y = 0.0
+                marker_right.pose.orientation.z = 0.0
+                marker_right.pose.orientation.w = 1.0
+                marker_right.scale.x = 0.005
+                marker_right.scale.y = 0.005
+                marker_right.scale.z = 0.005
+                marker_right.color.a = 1.0  # Totalmente opaco
+                marker_right.color.r = 1.0
+                marker_right.color.g = 0.0
+                marker_right.color.b = 0.0  # Vermelho
+
+                # Publica ambos os markers
+                self.marker_pub.publish(marker_left)
+                self.marker_pub.publish(marker_right)
 
         except Exception as e:
             print(e)
 
         finally:
-            # Restaura as configurações do terminal
             termios.tcsetattr(sys.stdin, termios.TCSADRAIN, self.settings)
             print("Teleop encerrado.")
-
 
 if __name__ == '__main__':
     try:

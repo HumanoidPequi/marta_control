@@ -121,16 +121,8 @@ class WalkingNode:
             'hip_pitch0': rospy.get_param('/walking_params/hip_pitch0', 0.0),
             'knee_pitch0': rospy.get_param('/walking_params/knee_pitch0', 0.0),
             'ankle_pitch0': rospy.get_param('/walking_params/ankle_pitch0', 0.0),
-            'torso_to_left_hip': rospy.get_param('/walking_params/torso_to_left_hip', [0.0, 0.008, -0.02]),
-            'left_ankle_to_left_foot': rospy.get_param('/walking_params/left_ankle_to_left_foot', [-0.013, -0.040, -0.035]),
-            
-            'period': rospy.get_param('/walking_params/period', 0.5),
-            'doubleSupportRatio': rospy.get_param('/walking_params/doubleSupportRatio', 0.2),
-            'zCom': rospy.get_param('/walking_params/zCom', 0.25),
-            'zStep': rospy.get_param('/walking_params/zStep', 0.05),
-            'armCompensationFactor': rospy.get_param('/walking_params/armCompensationFactor', 1.0),
-            'comSwingFactor': rospy.get_param('/walking_params/comSwingFactor', 0.5),
-            'ySeparation' : rospy.get_param('/walking_params/ySeparation', 0.0475),
+            'torso_to_left_hip': rospy.get_param('/walking_params/torso_to_left_hip', [0.007, 0.040, -0.103]),
+            'left_ankle_to_left_foot': rospy.get_param('/walking_params/left_ankle_to_left_foot', [0.001, -0.001, -0.038]),
 
             'upper_arm_length': rospy.get_param('/arm_params/upper_arm_length', 0.1136),
             'lower_arm_length': rospy.get_param('/arm_params/lower_arm_length', 0.1550),
