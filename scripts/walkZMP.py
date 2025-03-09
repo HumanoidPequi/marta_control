@@ -3,7 +3,7 @@ import math
 import rospy
 from sensor_msgs.msg import JointState
 from geometry_msgs.msg import Point  # Usado para receber as velocidades (vx, vy, vψ)
-
+import tf
 
 def normalize_angle(angle):
     """Normaliza o ângulo para o intervalo [-pi, pi]."""
@@ -43,6 +43,9 @@ class WalkingZMP:
         self.rate = rospy.Rate(100)  # 10 Hz
         self.start_time = rospy.Time.now()
 
+        # Inicialize seu TransformListener
+        self.tf_listener = tf.TransformListener()
+
         # Velocidades iniciais
         self.v_x = 0.0  # vx
         self.v_y = 0.0  # vy
@@ -62,6 +65,9 @@ class WalkingZMP:
         self.swing_foot_end = {'x': 0.0, 'y': self.torso_end['y'] - self.walking_params['ySeparation'], 'z': 0.0}
         self.previous_torso = self.torso_end.copy()
         self.left_is_swing_foot = True
+
+        self.braco_inicio = {'x': 0.0, 'y': 0.0 , 'z': -0.151}
+        self.braco_fim = {'x': 0.156, 'y': 0.0 , 'z': -0.151}
 
 
 ######################### FUNCOES SUPORTE DO ROS ###########################
@@ -100,6 +106,8 @@ class WalkingZMP:
         self.v_z = msg.z
         rospy.loginfo("Received velocities: vx=%.2f, vy=%.2f, vψ=%.2f", self.v_x, self.v_y, self.v_z)
 
+############################ FUNCOES DE CALCULO DE POSE DA CAMINHADA #################
+
     def compute_torso_displacement(self, T):
         """
         Calcula o deslocamento do torso para um passo de duração T.
@@ -122,8 +130,6 @@ class WalkingZMP:
             disp_y = a * math.sin(self.v_z * T / 2.0) + b * math.cos(self.v_z * T / 2.0)
             disp_z = T * self.v_z
         return disp_x, disp_y, disp_z
-
-############################ FUNCOES DE CALCULO DE POSE DA CAMINHADA #################
 
     def get_desired_torso_displacement(self, torso_begin):
         """
@@ -386,6 +392,48 @@ class WalkingZMP:
         else:
             return 1.0
 
+    def get_tf_from_base_com(self):
+        """
+        Obtém a transformação do frame 'center_of_mass' em relação ao 'base_link'.
+        Se o CoM estivesse exatamente no ponto de origem de base_link,
+        a transformação seria [0, 0, 0]. Assim, esse vetor indica
+        o desvio atual que pode ser usado para corrigir a posição do torso.
+        """
+        try:
+            # Aguarda até que a transformação esteja disponível
+            self.tf_listener.waitForTransform("base_link", "center_of_mass", rospy.Time(0), rospy.Duration(1.0))
+            (trans_com, _) = self.tf_listener.lookupTransform("base_link", "center_of_mass", rospy.Time(0))
+            return trans_com
+        except (tf.LookupException, tf.ConnectivityException, tf.ExtrapolationException) as e:
+            rospy.logwarn("Erro ao obter TF center_of_mass->base_link: %s", e)
+            return [0.0, 0.0, 0.0]
+
+    def posicao_braco(self, t, braco_inicio, braco_fim):
+        """
+        Retorna a posição do braço esquerdo interpolada linearmente
+        entre a posição inicial [0.000, 0.000, -0.207] e a final [0.054, 0.000, -0.207].
+        
+        Parâmetro:
+            t: parâmetro de interpolação no intervalo [0, 1]
+            (t=0 => posição inicial; t=1 => posição final)
+        """
+        # Coordenada X varia 
+        x_inicial = braco_inicio['x']
+        x_final   = braco_fim['x']
+        x = (1 - t) * x_inicial + t * x_final
+
+        # Coordenada Y varia 
+        y_inicial = braco_inicio['y']
+        y_final   = braco_fim['y']
+        y = (1 - t) * y_inicial + t * y_final
+
+        # Coordenada Z varia 
+        z_inicial = braco_inicio['z']
+        z_final   = braco_fim['z']
+        z = (1 - t) * z_inicial + t * z_final
+
+        return [x, y, z]
+
 
     def run(self):
         while not rospy.is_shutdown():
@@ -408,6 +456,7 @@ class WalkingZMP:
             aPy, aNy = self.solve_zmp(0.0, self.torso_begin['y'], self.torso_end['y'], self.torso_begin['y'], self.torso_end['y'], 
                 self.walking_params['period'], self.walking_params['doubleSupportRatio'], self.walking_params['tZMP'])
 
+            # computa a posicao do CoM
             comX = self.get_com(t_norm, aPx, aNx, 0.0, self.torso_begin['x'], self.torso_end['x'],
                 self.walking_params['period'], self.walking_params['doubleSupportRatio'], self.walking_params['tZMP'])
             comY = self.get_com(t_norm, aPy, aNy, 0.0, self.torso_begin['y'], self.torso_end['y'],
@@ -415,6 +464,7 @@ class WalkingZMP:
 
             # rospy.loginfo("CoM: (%.3f, %.3f, %.3f)", comX, comY, self.walking_params['zCom'])
 
+            # gera as interpolacoes
             xFrac = self.compute_x_frac(t_norm, self.walking_params['doubleSupportRatio'])
             yFrac = self.compute_y_frac(t_norm, self.walking_params['doubleSupportRatio'])
             zFrac = self.compute_z_frac(t_norm, self.walking_params['doubleSupportRatio'])
@@ -425,6 +475,11 @@ class WalkingZMP:
             thetaTorso = self.torso_begin['z'] + (self.torso_end['z'] - self.torso_begin['z']) * thetaFrac
 
             torso = {'x': comX, 'y': comY, 'z': thetaTorso}
+
+            torso['x'] -= self.get_tf_from_base_com()[0]
+            torso['y'] -= self.get_tf_from_base_com()[1]
+            torso['z'] -= self.get_tf_from_base_com()[2]
+            
             # rospy.loginfo("torso: X=%.3f, Y=%.3f, Z=%.3f", comX, comY, thetaTorso)
 
             # Calcula a posição global (no caso, global eh com referencia ao pe de suporte)
@@ -447,7 +502,9 @@ class WalkingZMP:
             rospy.loginfo("swing_foot: X=%.3f, Y=%.3f, Z=%.3f || support_foot: X=%.3f, Y=%.3f, Z=%.3f", swing_foot['x'], swing_foot['y'], z_swing, support_foot['x'], support_foot['y'], z_support)
             
 
-            #TODO: Usar a TF do CoM para calcular as posicoes
+            braco_esquerdo_position = self.posicao_braco(t_norm, self.braco_inicio, self.braco_fim)
+            braco_direito_position = self.posicao_braco(t_norm, self.braco_fim, self.braco_inicio)
+
             # passa a posicao dos pes para a cinematica inversa
             joint_state = JointState()
             if self.left_is_swing_foot:
@@ -460,7 +517,12 @@ class WalkingZMP:
                     -support_foot['y'],# posição y do support foot
                     z_support,        # altura do support foot
                     support_foot['x'],# (ou outro valor desejado, conforme sua definição)
-                    0, 0, 0, 0, 0, 0  # demais elementos zerados
+                    braco_esquerdo_position[0], 
+                    braco_esquerdo_position[1],
+                    braco_esquerdo_position[2], 
+                    braco_direito_position[0], 
+                    braco_direito_position[1], 
+                    braco_direito_position[2]
                 ]
             else:
                 joint_state.position = [
@@ -472,7 +534,12 @@ class WalkingZMP:
                     -swing_foot['y'],  # posição y do swing foot
                     z_swing,          # altura do swing foot
                     swing_foot['x'],  # (ou outro valor desejado)
-                    0, 0, 0, 0, 0, 0  # demais elementos zerados
+                    braco_direito_position[0], 
+                    braco_direito_position[1], 
+                    braco_direito_position[2],
+                    braco_esquerdo_position[0], 
+                    braco_esquerdo_position[1],
+                    braco_esquerdo_position[2] 
                 ]
 
             # publica a posicao para os pes
