@@ -3,7 +3,7 @@ import rospy
 import actionlib
 import tf
 from sensor_msgs.msg import Imu
-from my_robot_msgs.msg import RaiseAction, RaiseFeedback, RaiseResult
+from marta_msgs.msg import RaiseAction, RaiseFeedback, RaiseResult
 import subprocess
 
 current_angle = 0.0
