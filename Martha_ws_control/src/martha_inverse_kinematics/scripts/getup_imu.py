@@ -6,7 +6,6 @@ from sensor_msgs.msg import Imu
 from my_robot_msgs.msg import RaiseAction, RaiseFeedback, RaiseResult
 import subprocess
 
-# Variável global para armazenar o ângulo de pitch (em radianos)
 current_angle = 0.0
 
 def imu_callback(data):
@@ -19,13 +18,13 @@ def imu_callback(data):
 
 def call_raise_front():
     rospy.loginfo("Chamando nó de levantamento pela frente...")
-    # Substitua "my_robot_package" pelo nome do seu pacote
-    subprocess.Popen(["rosrun", "my_robot_package", "levante_frente_raw_angle.py"])
+
+    #subprocess.Popen(["rosrun", "martha_inverse_kinematics", "levante_frente_raw_angle.py"])
 
 def call_raise_back():
     rospy.loginfo("Chamando nó de levantamento por trás...")
-    # Substitua "my_robot_package" pelo nome do seu pacote
-    subprocess.Popen(["rosrun", "my_robot_package", "levante_tras_raw_angle.py"])
+
+    #subprocess.Popen(["rosrun", "martha_inverse_kinematics", "levante_tras_raw_angle.py"])
 
 def execute_callback(goal):
     rospy.loginfo("Goal recebido. Verificando orientação do IMU...")
