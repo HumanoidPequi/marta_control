@@ -31,9 +31,9 @@ OmnidirectionalWalkZMPParams OmnidirectionalWalkZMPParams::getDefaultOmnidirecio
     OmnidirectionalWalkZMPParams params;
     params.period = 0.8;
     params.doubleSupportRatio = 0.4;          // Proporção de tempo em que ambos os pés estão no chão
-    params.ySeparation = 0.08;                // Separação lateral entre os pés.
+    params.ySeparation = 0.06;                // Separação lateral entre os pés.
     params.zCom = 0.297509;                   // Altura do centro de massa (CoM - Center of Mass)
-    params.zStep = 0.04;                      // Altura do movimento oscilatório do pé durante o passo
+    params.zStep = 0.06;                      // Altura do movimento oscilatório do pé durante o passo
     params.armsCompensationFactor = 1.0;      // Fator de compensação do movimento dos braços para equilibrar o movimento do torso
     params.comSwingFactor = 1.0;              // Fator que ajusta a amplitude do movimento do CoM
     return params;
