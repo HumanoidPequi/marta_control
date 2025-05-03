@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Load the robot parameters -->
+  <rosparam command="load" file="$(find common)/config/params.yaml" />
+
+  <!-- Start the leg controller node -->
+  <node name="leg_controller" pkg="walking" type="leg_controller_node.py" output="screen" />
+
+  <!-- Start the walk node -->
+  <node name="walk_node" pkg="walking" type="walk_node.py" output="screen" />
+</launch>

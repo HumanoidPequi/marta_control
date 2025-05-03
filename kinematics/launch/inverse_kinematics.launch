@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Load the robot parameters -->
+  <rosparam command="load" file="$(find common)/config/params.yaml" />
+
+  <!-- Start the inverse kinematics node -->
+  <node name="inverse_kinematics" pkg="kinematics" type="inverseKinematics_node.py" output="screen" />
+</launch>

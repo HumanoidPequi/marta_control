@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Load the robot parameters -->
+  <rosparam command="load" file="$(find common)/config/params.yaml" />
+
+  <!-- Start the getup node -->
+  <node name="getup_node" pkg="actions" type="levante.py" output="screen" />
+</launch>

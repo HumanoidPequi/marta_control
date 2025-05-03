@@ -1,0 +1,8 @@
+<?xml version="1.0"?>
+<launch>
+  <!-- Load the robot parameters -->
+  <rosparam command="load" file="$(find common)/config/params.yaml" />
+
+  <!-- Start the kick node -->
+  <node name="kick_node" pkg="actions" type="kick.py" output="screen" />
+</launch>
