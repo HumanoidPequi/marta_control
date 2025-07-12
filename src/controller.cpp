@@ -5,7 +5,6 @@ using namespace control::walking;
 using itandroids_lib::math::Pose2D;
 
 ControllerNode::ControllerNode(Joints &joints) : nh_("~") {
-    usleep(500000000);
     joints.StandardNames();
     pubPescocoYaw_ = nh_.advertise<std_msgs::Float64>(joints.PescocoYawTopic, 10);
     pubCabecaPitch_ = nh_.advertise<std_msgs::Float64>(joints.CabecaPitchTopic, 10);
@@ -61,7 +60,7 @@ ControllerNode::~ControllerNode() {
 }
 
 float ControllerNode::normalize(float x) {
-    return ((x + 45) / 90.0) * 0.6 + 0.7;
+    return ((x + 45) / 90.0) * 0.8 + 0.6;
 }
 
 void ControllerNode::timerCallback(const ros::TimerEvent &event) {
@@ -181,11 +180,12 @@ void ControllerNode::Update(Joints &joints){
     OmnidirectionalWalkZMP walker(walkParams, physicalParams, &inverseKinematics);
 
     double elapsedTime = 0.01; // Tempo de iteração
+    double elapsedTimeMic = elapsedTime * 1000000; // Tempo em microssegundos
 
     itandroids_lib::math::Pose2D desiredVelocity;
 
     // Configure os valores da velocidade
-    desiredVelocity.translation.x = 0.05; // Velocidade no eixo x
+    desiredVelocity.translation.x = 0.1; // Velocidade no eixo x
     desiredVelocity.translation.y = 0.0; // Velocidade no eixo y
     desiredVelocity.rotation = 0.0;      // Velocidade de rotação (yaw)
 
@@ -194,7 +194,7 @@ void ControllerNode::Update(Joints &joints){
     
     // Fazendo a Marta agachar lentamente
     walker.update(elapsedTime, joints, Xscale_);
-    int N = 200;
+    int N = 50;
     for (int i = 1; i <= N; ++i) {
         publishJoints(joints, (float)i/N);
         usleep(100000);
@@ -203,7 +203,7 @@ void ControllerNode::Update(Joints &joints){
     for (int i = 0; i < 100000; ++i) {
         walker.update(elapsedTime, joints, Xscale_);
         publishJoints(joints, 1);
-        usleep(10000);
+        usleep(elapsedTimeMic);
     }
 
 }
