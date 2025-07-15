@@ -5,12 +5,16 @@
 #include <std_msgs/Float64.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <unistd.h>
+#include <deque>
+#include <numeric>
 #include "Joints.h"
 #include "RobotPhysicalParameters.h"
 #include "OmnidirectionalWalkZMP.h"
 #include "InverseKinematics.h"
 #include <thread>
 #include <std_srvs/Trigger.h>
+#include <marta_msgs/Levantar.h>
+#include <sensor_msgs/Imu.h>
 
 namespace control {
 namespace walking {
@@ -23,7 +27,9 @@ public:
 
     void publishJoints(Joints &joints, float scalar);
 
-    void publishJointsReal(Joints &joints, float scalar);
+    void Agacha(Joints &joints);
+
+
 
 private:
     ros::Publisher pubPescocoYaw_;
@@ -52,16 +58,24 @@ private:
     ros::Publisher pub_right_arm;
     ros::Publisher pub_left_arm_head;
 
+    ros::Subscriber imu_sub_;
+
+    std::deque<double> imuXAccBuffer_;
     bool get_angle_x_axis_available_ = true;
+    bool isReal_ = false;
     float dt;
     float Xscale_ = 1.0;
+    float imuXAcc_ = 0.0;
     ros::Timer timer_;
-    ros::ServiceClient client_;
+    ros::ServiceClient clientAngles_;
+    ros::ServiceClient client_frente_;
+    ros::ServiceClient client_tras_;
     std::thread functionThread_;
 
     // Nó ROS
     ros::NodeHandle nh_;
 
+    void imuCallback(const sensor_msgs::Imu::ConstPtr& msg);
     void timerCallback(const ros::TimerEvent &event);
     void Update(Joints &joints);
     float normalize(float x);

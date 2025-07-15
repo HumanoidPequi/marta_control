@@ -38,9 +38,9 @@ ControllerNode::ControllerNode(Joints &joints) : nh_("~") {
 
 
     // Service client to get the angle of the x axis
-    client_ = nh_.serviceClient<std_srvs::Trigger>("/get_angle_x_axis");
+    clientAngles_ = nh_.serviceClient<std_srvs::Trigger>("/get_angle_x_axis");
     ros::Duration timeout(5.0);
-    if (!client_.waitForExistence(timeout)) {
+    if (!clientAngles_.waitForExistence(timeout)) {
         ROS_ERROR("The service 'get_angle_x_axis' is not available!");
         get_angle_x_axis_available_ = false;
     }
@@ -50,7 +50,32 @@ ControllerNode::ControllerNode(Joints &joints) : nh_("~") {
         timer_ = nh_.createTimer(ros::Duration(dt), &ControllerNode::timerCallback, this);
     }
 
+    client_frente_ = nh_.serviceClient<marta_msgs::Levantar>("/levantar_para_frente");
+    if (!client_frente_.waitForExistence(timeout)) {
+        ROS_ERROR("The service 'levantar_para_frente' is not available!");
+    }
+
+    client_tras_ = nh_.serviceClient<marta_msgs::Levantar>("/levantar_para_tras");
+    if (!client_tras_.waitForExistence(timeout)) {
+        ROS_ERROR("The service 'levantar_para_tras' is not available!");
+    }
+
     functionThread_ = std::thread(std::bind(&ControllerNode::Update, this, joints));
+
+    imu_sub_ = nh_.subscribe("/marta/imu", 400, &ControllerNode::imuCallback, this);
+}
+
+void ControllerNode::imuCallback(const sensor_msgs::Imu::ConstPtr& msg) {
+    // Adiciona novo valor ao buffer
+    imuXAccBuffer_.push_back(msg->linear_acceleration.x);
+    
+    // Mantém o buffer com tamanho máximo de 20
+    if (imuXAccBuffer_.size() > 20) {
+        imuXAccBuffer_.pop_front();
+    }
+    
+    // Calcula a média
+    imuXAcc_ = std::accumulate(imuXAccBuffer_.begin(), imuXAccBuffer_.end(), 0.0) / imuXAccBuffer_.size();
 }
 
 ControllerNode::~ControllerNode() {
@@ -66,7 +91,7 @@ float ControllerNode::normalize(float x) {
 void ControllerNode::timerCallback(const ros::TimerEvent &event) {
     std_srvs::Trigger srv;
 
-    if (client_.call(srv)) {
+    if (clientAngles_.call(srv)) {
         if (srv.response.success) {
             float angle = std::stof(srv.response.message);
 
@@ -77,7 +102,6 @@ void ControllerNode::timerCallback(const ros::TimerEvent &event) {
             }
 
             Xscale_ = normalize(angle);
-            std::cout << "Xscale_: " << Xscale_ << std::endl;
 
         } else {
             ROS_WARN("Fail: %s", srv.response.message.c_str());
@@ -88,82 +112,89 @@ void ControllerNode::timerCallback(const ros::TimerEvent &event) {
 
 }
 
-
-void ControllerNode::publishJointsReal(Joints &joints, float scalar) {
-    std_msgs::Float64 msg;
-    std_msgs::Float64MultiArray msg_array;
-
-    msg_array.data = {0, 0, joints.leftShoulderPitch * scalar, joints.leftShoulderRoll * scalar, 0};
-    pub_left_arm_head.publish(msg_array);
-
-    msg_array.data = {joints.rightShoulderPitch * scalar, joints.rightShoulderRoll * scalar, 0};
-    pub_right_arm.publish(msg_array);
-
-    msg_array.data = {joints.leftHipYaw * scalar, joints.leftHipRoll * scalar, joints.leftHipPitch* scalar, joints.leftKneePitch* scalar , joints.leftAnklePitch * scalar, joints.leftAnkleRoll * scalar};
-    pub_left_leg.publish(msg_array);
-
-    msg_array.data = {joints.rightHipYaw * scalar, joints.rightHipRoll * scalar, joints.rightHipPitch * scalar, joints.rightKneePitch * scalar, joints.rightAnklePitch * scalar, joints.rightAnkleRoll * scalar};
-    pub_right_leg.publish(msg_array);
-}
-
 void ControllerNode::publishJoints(Joints &joints, float scalar) {
-    std_msgs::Float64 msg;
+    if(isReal_) {
+        std_msgs::Float64 msg;
+        std_msgs::Float64MultiArray msg_array;
 
-    msg.data = joints.neckPitch * scalar;
-    pubCabecaPitch_.publish(msg);
+        msg_array.data = {0, 0, joints.leftShoulderPitch * scalar, joints.leftShoulderRoll * scalar, 0};
+        pub_left_arm_head.publish(msg_array);
 
-    msg.data = joints.neckYaw * scalar;
-    pubPescocoYaw_.publish(msg);
+        msg_array.data = {joints.rightShoulderPitch * scalar, joints.rightShoulderRoll * scalar, 0};
+        pub_right_arm.publish(msg_array);
 
-    msg.data = joints.leftShoulderPitch * scalar;
-    pubOmbroEsquerdoPitch_.publish(msg);
+        msg_array.data = {joints.leftHipYaw * scalar, joints.leftHipRoll * scalar, joints.leftHipPitch* scalar, joints.leftKneePitch* scalar , joints.leftAnklePitch * scalar, joints.leftAnkleRoll * scalar};
+        pub_left_leg.publish(msg_array);
 
-    msg.data = joints.leftShoulderRoll * scalar;
-    pubOmbroEsquerdoRoll_.publish(msg);
+        msg_array.data = {joints.rightHipYaw * scalar, joints.rightHipRoll * scalar, joints.rightHipPitch * scalar, joints.rightKneePitch * scalar, joints.rightAnklePitch * scalar, joints.rightAnkleRoll * scalar};
+        pub_right_leg.publish(msg_array);
+    }else{
 
-    msg.data = joints.rightShoulderPitch * scalar;
-    pubOmbroDireitoPitch_.publish(msg);
+        std_msgs::Float64 msg;
 
-    msg.data = joints.rightShoulderRoll * scalar;
-    pubOmbroDireitoRoll_.publish(msg);
+        msg.data = joints.neckPitch * scalar;
+        pubCabecaPitch_.publish(msg);
 
-    msg.data = joints.leftHipYaw * scalar;
-    pubQuadrilEsquerdoYaw_.publish(msg);
+        msg.data = joints.neckYaw * scalar;
+        pubPescocoYaw_.publish(msg);
 
-    msg.data = joints.leftHipRoll * scalar;
-    pubQuadrilEsquerdoRoll_.publish(msg);
+        msg.data = joints.leftShoulderPitch * scalar;
+        pubOmbroEsquerdoPitch_.publish(msg);
 
-    msg.data = joints.leftHipPitch * scalar;
-    pubQuadrilEsquerdoPitch_.publish(msg);
+        msg.data = joints.leftShoulderRoll * scalar;
+        pubOmbroEsquerdoRoll_.publish(msg);
 
-    msg.data = joints.leftKneePitch * scalar;
-    pubJoelhoEsquerdoPitch_.publish(msg);
+        msg.data = joints.rightShoulderPitch * scalar;
+        pubOmbroDireitoPitch_.publish(msg);
 
-    msg.data = joints.leftAnklePitch * scalar;
-    pubPeEsquerdoPitch_.publish(msg);
+        msg.data = joints.rightShoulderRoll * scalar;
+        pubOmbroDireitoRoll_.publish(msg);
 
-    msg.data = joints.leftAnkleRoll * scalar;
-    pubPeEsquerdoRoll_.publish(msg);
+        msg.data = joints.leftHipYaw * scalar;
+        pubQuadrilEsquerdoYaw_.publish(msg);
 
-    msg.data = joints.rightHipYaw * scalar;
-    pubQuadrilDireitoYaw_.publish(msg);
+        msg.data = joints.leftHipRoll * scalar;
+        pubQuadrilEsquerdoRoll_.publish(msg);
 
-    msg.data = joints.rightHipRoll * scalar;
-    pubQuadrilDireitoRoll_.publish(msg);
+        msg.data = joints.leftHipPitch * scalar;
+        pubQuadrilEsquerdoPitch_.publish(msg);
 
-    msg.data = joints.rightHipPitch * scalar;
-    pubQuadrilDireitoPitch_.publish(msg);
+        msg.data = joints.leftKneePitch * scalar;
+        pubJoelhoEsquerdoPitch_.publish(msg);
 
-    msg.data = joints.rightKneePitch * scalar;
-    pubJoelhoDireitoPitch_.publish(msg);
+        msg.data = joints.leftAnklePitch * scalar;
+        pubPeEsquerdoPitch_.publish(msg);
 
-    msg.data = joints.rightAnklePitch * scalar;
-    pubPeDireitoPitch_.publish(msg);
+        msg.data = joints.leftAnkleRoll * scalar;
+        pubPeEsquerdoRoll_.publish(msg);
 
-    msg.data = joints.rightAnkleRoll * scalar;
-    pubPeDireitoRoll_.publish(msg);
+        msg.data = joints.rightHipYaw * scalar;
+        pubQuadrilDireitoYaw_.publish(msg);
 
+        msg.data = joints.rightHipRoll * scalar;
+        pubQuadrilDireitoRoll_.publish(msg);
+
+        msg.data = joints.rightHipPitch * scalar;
+        pubQuadrilDireitoPitch_.publish(msg);
+
+        msg.data = joints.rightKneePitch * scalar;
+        pubJoelhoDireitoPitch_.publish(msg);
+
+        msg.data = joints.rightAnklePitch * scalar;
+        pubPeDireitoPitch_.publish(msg);
+
+        msg.data = joints.rightAnkleRoll * scalar;
+        pubPeDireitoRoll_.publish(msg);
+    }
 };
+
+void ControllerNode::Agacha(Joints &joints) {
+    int N = 100;
+    for (int i = 1; i <= N; ++i) {
+        publishJoints(joints, (float)i/N);
+        usleep(100000);
+    }
+}
 
 void ControllerNode::Update(Joints &joints){
     // Configuração dos parâmetros físicos do robô
@@ -194,16 +225,42 @@ void ControllerNode::Update(Joints &joints){
     
     // Fazendo a Marta agachar lentamente
     walker.update(elapsedTime, joints, Xscale_);
-    int N = 50;
-    for (int i = 1; i <= N; ++i) {
-        publishJoints(joints, (float)i/N);
-        usleep(100000);
-    }
+    Agacha(joints);
     
-    for (int i = 0; i < 100000; ++i) {
-        walker.update(elapsedTime, joints, Xscale_);
-        publishJoints(joints, 1);
-        usleep(elapsedTimeMic);
+    while (ros::ok()) {
+
+        if(imuXAcc_ > 3){
+            ROS_WARN("Marta esta deitada para frente, Tentando levantar");
+
+            marta_msgs::Levantar srv;
+
+            client_frente_.call(srv);
+
+            if(srv.response.success){
+                ROS_INFO("%s", srv.response.message.c_str());
+            }else{
+                ROS_ERROR("%s", srv.response.message.c_str());
+            }
+            walker.restart();
+
+        }else if(imuXAcc_ < -3){
+            ROS_WARN("Marta esta deitada para tras. Tentando levantar");
+
+            marta_msgs::Levantar srv;
+            client_tras_.call(srv);
+
+            if(srv.response.success){
+                ROS_INFO("%s", srv.response.message.c_str());
+            }else{
+                ROS_ERROR("%s", srv.response.message.c_str());
+            }
+            walker.restart();
+            
+        }else{
+            walker.update(elapsedTime, joints, Xscale_);
+            publishJoints(joints, 1);
+            usleep(elapsedTimeMic);
+        }
     }
 
 }
