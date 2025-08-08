@@ -3,6 +3,7 @@
 
 #include <ros/ros.h>
 #include <std_msgs/Float64.h>
+#include <std_msgs/Float32.h>
 #include <std_msgs/Float64MultiArray.h>
 #include <unistd.h>
 #include <deque>
@@ -59,25 +60,38 @@ private:
     ros::Publisher pub_left_arm_head;
 
     ros::Subscriber imu_sub_;
+    ros::Subscriber ball_distance_sub_;
 
     std::deque<double> imuXAccBuffer_;
+    
     bool get_angle_x_axis_available_ = true;
     bool isReal_ = false;
+    bool hasBallDistance_ = false;
+    
     float dt;
     float Xscale_ = 1.0;
     float imuXAcc_ = 0.0;
+    float translationX_ = 0.0;
+    float translationY_ = 0.0;
+    float rotationZ_ = 0.0;
+
     ros::Timer timer_;
+    ros::Time hasBallTimer_;
+
     ros::ServiceClient clientAngles_;
     ros::ServiceClient client_frente_;
     ros::ServiceClient client_tras_;
     std::thread functionThread_;
+    std::thread calculateVelocity_;
 
     // Nó ROS
     ros::NodeHandle nh_;
 
     void imuCallback(const sensor_msgs::Imu::ConstPtr& msg);
     void timerCallback(const ros::TimerEvent &event);
+    void ballDistanceCallback(const std_msgs::Float32::ConstPtr &msg);
     void Update(Joints &joints);
+    void calculateVelocity();
     float normalize(float x);
 };
 

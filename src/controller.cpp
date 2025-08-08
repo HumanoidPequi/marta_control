@@ -36,6 +36,7 @@ ControllerNode::ControllerNode(Joints &joints) : nh_("~") {
     pub_right_arm = nh_.advertise<std_msgs::Float64MultiArray>(joints.arm_r, 10);
     pub_left_arm_head = nh_.advertise<std_msgs::Float64MultiArray>(joints.arm_l_head, 10);
 
+    hasBallTimer_ = ros::Time::now();
 
     // Service client to get the angle of the x axis
     clientAngles_ = nh_.serviceClient<std_srvs::Trigger>("/get_angle_x_axis");
@@ -61,8 +62,17 @@ ControllerNode::ControllerNode(Joints &joints) : nh_("~") {
     }
 
     functionThread_ = std::thread(std::bind(&ControllerNode::Update, this, joints));
+    calculateVelocity_ = std::thread(std::bind(&ControllerNode::calculateVelocity, this));
 
+    // Subscribers
     imu_sub_ = nh_.subscribe("/marta/imu", 400, &ControllerNode::imuCallback, this);
+    ball_distance_sub_ = nh_.subscribe("/marta/ball_distance", 10, &ControllerNode::ballDistanceCallback, this);
+}
+
+void ControllerNode::ballDistanceCallback(const std_msgs::Float32::ConstPtr& msg) {
+    hasBallDistance_ = true;
+    hasBallTimer_ = ros::Time::now();
+    ROS_INFO("Ball distance: %f", msg->data);
 }
 
 void ControllerNode::imuCallback(const sensor_msgs::Imu::ConstPtr& msg) {
@@ -132,11 +142,11 @@ void ControllerNode::publishJoints(Joints &joints, float scalar) {
 
         std_msgs::Float64 msg;
 
-        msg.data = joints.neckPitch * scalar;
-        pubCabecaPitch_.publish(msg);
+        //msg.data = joints.neckPitch * scalar;
+        //pubCabecaPitch_.publish(msg);
 
-        msg.data = joints.neckYaw * scalar;
-        pubPescocoYaw_.publish(msg);
+        //msg.data = joints.neckYaw * scalar;
+        //pubPescocoYaw_.publish(msg);
 
         msg.data = joints.leftShoulderPitch * scalar;
         pubOmbroEsquerdoPitch_.publish(msg);
@@ -216,9 +226,9 @@ void ControllerNode::Update(Joints &joints){
     itandroids_lib::math::Pose2D desiredVelocity;
 
     // Configure os valores da velocidade
-    desiredVelocity.translation.x = 0.1; // Velocidade no eixo x
-    desiredVelocity.translation.y = 0.0; // Velocidade no eixo y
-    desiredVelocity.rotation = 0.0;      // Velocidade de rotação (yaw)
+    desiredVelocity.translation.x = translationX_; // Velocidade no eixo x
+    desiredVelocity.translation.y = translationY_; // Velocidade no eixo y
+    desiredVelocity.rotation = rotationZ_;         // Velocidade de rotação (yaw)
 
     // Chame a função setDesiredVelocity
     walker.setDesiredVelocity(desiredVelocity);
@@ -229,7 +239,7 @@ void ControllerNode::Update(Joints &joints){
     
     while (ros::ok()) {
 
-        if(imuXAcc_ > 3){
+        if(imuXAcc_ > 8){
             ROS_WARN("Marta esta deitada para frente, Tentando levantar");
 
             marta_msgs::Levantar srv;
@@ -243,7 +253,7 @@ void ControllerNode::Update(Joints &joints){
             }
             walker.restart();
 
-        }else if(imuXAcc_ < -3){
+        }else if(imuXAcc_ < -8){
             ROS_WARN("Marta esta deitada para tras. Tentando levantar");
 
             marta_msgs::Levantar srv;
@@ -257,6 +267,13 @@ void ControllerNode::Update(Joints &joints){
             walker.restart();
             
         }else{
+            desiredVelocity.translation.x = translationX_; // Velocidade no eixo x
+            desiredVelocity.translation.y = translationY_; // Velocidade no eixo y
+            desiredVelocity.rotation = rotationZ_;         // Velocidade de rotação (yaw)
+
+            // Chame a função setDesiredVelocity
+            walker.setDesiredVelocity(desiredVelocity);
+            
             walker.update(elapsedTime, joints, Xscale_);
             publishJoints(joints, 1);
             usleep(elapsedTimeMic);
@@ -264,6 +281,31 @@ void ControllerNode::Update(Joints &joints){
     }
 
 }
+
+void ControllerNode::calculateVelocity(){
+    while (ros::ok()) {
+        ROS_INFO("hasBallTimer_: %f", hasBallTimer_.toSec() );
+        ROS_INFO("ros::Time::now(): %f", ros::Time::now().toSec() );
+
+        // Diferença de tempo corrido em segundos:
+        double dt = (ros::Time::now().toSec() - hasBallTimer_.toSec());
+        
+        if (dt > 5.0){
+            ROS_INFO("Marta nao tem a bola, parando de andar");
+            translationX_ = 0.1;
+            translationY_ = 0.0;
+            rotationZ_ = 0.0;
+        }else{
+            ROS_INFO("Marta tem a bola, andando");
+            translationX_ = 0.1;
+            translationY_ = 0.0;
+            rotationZ_ = 0.0;
+        }
+
+        usleep(100000);
+    }
+}
+
 int main(int argc, char** argv) {
     ros::init(argc, argv, "controller_node");
 

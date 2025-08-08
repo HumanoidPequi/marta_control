@@ -160,13 +160,13 @@ class LevantarParaTrasServer:
             ],
 
             #posicao inicial
-            [0, 0, 0, 0, 0, 0, #perna esquerda
-             0, 0, 0, 0, 0, 0, #perna direita
-             0, 0, 0, #braço esquerdo
-             0, 0, 0], #braço direito
+            [-0.30,  0.06, -0.68,  1.56, -0.96, -0.06,   # perna esquerda
+            -0.30, -0.25, -0.46,  1.41, -1.04,  0.25,   # perna direita
+            0.00, -0.87,  0.00,                       # braço esquerdo
+            -0.05,  0.87,  0.00]                        # braço direito
             
         ]
-        delays = [2.0, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 2.0, 2.0, 3.0]
+        delays = [2.0, 1.0, 0.5, 0.5, 1.0, 0.5, 0.5, 0.5, 0.5, 0.5, 2.0, 2.0, 0.01]
         
         rate = 100
         steps = [int(rate * delay) for delay in delays]
