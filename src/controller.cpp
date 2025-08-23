@@ -5,6 +5,9 @@ using namespace control::walking;
 using itandroids_lib::math::Pose2D;
 
 ControllerNode::ControllerNode(Joints &joints) : nh_("~") {
+
+    nh_.param<bool>("isReal", isReal_, true);
+
     joints.StandardNames();
     pubPescocoYaw_ = nh_.advertise<std_msgs::Float64>(joints.PescocoYawTopic, 10);
     pubCabecaPitch_ = nh_.advertise<std_msgs::Float64>(joints.CabecaPitchTopic, 10);
@@ -127,7 +130,7 @@ void ControllerNode::publishJoints(Joints &joints, float scalar) {
         std_msgs::Float64 msg;
         std_msgs::Float64MultiArray msg_array;
 
-        msg_array.data = {0, 0, joints.leftShoulderPitch * scalar, joints.leftShoulderRoll * scalar, 0};
+        msg_array.data = {-10, -10, joints.leftShoulderPitch * scalar, joints.leftShoulderRoll * scalar, 0};
         pub_left_arm_head.publish(msg_array);
 
         msg_array.data = {joints.rightShoulderPitch * scalar, joints.rightShoulderRoll * scalar, 0};

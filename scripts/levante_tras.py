@@ -11,7 +11,7 @@ class LevantarParaTrasServer:
         
         # Define o serviço
         self.service = rospy.Service('/levantar_para_tras', Levantar, self.handle_levantar_para_tras)
-        self.isReal_ = False
+        self.isReal_ = rospy.get_param("~isReal", True)
         
         rospy.loginfo("Serviço 'levantar_para_tras' pronto.")
     
