@@ -47,7 +47,7 @@ void InverseKinematics::computeJointsTargetsOneLeg(double x, double y, double z,
 	*anklePitch = atan2(x, yz) - alpha - anklePitch0;
 	*hipRoll = atan2(y, z);
 	*ankleRoll = -*hipRoll;
-	*hipYaw = theta;
+	*hipYaw = hipYawSign * theta;
 
 
 

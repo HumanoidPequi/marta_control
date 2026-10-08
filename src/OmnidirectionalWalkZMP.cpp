@@ -64,18 +64,27 @@ void OmnidirectionalWalkZMP::setDesiredVelocity(itandroids_lib::math::Pose2D vel
 
 void OmnidirectionalWalkZMP::restart() {
     walkTime = 0.0;
-    leftFootIsSwing = false;
+    stepsSinceRestart = 0;
+    // Partida espelhavel: com o direito balancando primeiro (default), o pe de
+    // apoio esquerdo esta na origem e o torso e o pe direito ficam em -y; com
+    // o esquerdo primeiro, tudo vai para +y.
+    leftFootIsSwing = startLeftSwing;
+    const double side = startLeftSwing ? 1.0 : -1.0;
     torsoBegin.x = 0.0;
-    torsoBegin.y = -walkParams.ySeparation;
-    torsoBegin.z = 0.297509;
+    torsoBegin.y = side * walkParams.ySeparation;
+    // .z e o YAW do torso (Vector3 = x, y, theta), nao a altura. Ja foi
+    // 0.297509 (o valor de zCom colado no campo errado), o que comandava um
+    // giro de ~17 graus nas duas hip_yaw no primeiro passo de cada marcha.
+    // Travado por test/test_walk_symmetry.cpp.
+    torsoBegin.z = 0.0;
     torsoEnd.x = 0.0;
-    torsoEnd.y = -walkParams.ySeparation;
+    torsoEnd.y = side * walkParams.ySeparation;
     torsoEnd.z = 0.0;
     swingFootBegin.x = 0.0;
-    swingFootBegin.y = torsoBegin.y - walkParams.ySeparation;
+    swingFootBegin.y = torsoBegin.y + side * walkParams.ySeparation;
     swingFootBegin.z = 0.0;
     swingFootEnd.x = 0.0;
-    swingFootEnd.y = torsoEnd.y - walkParams.ySeparation;
+    swingFootEnd.y = torsoEnd.y + side * walkParams.ySeparation;
     swingFootEnd.z = 0.0;
     odometry.x = 0.0;
     odometry.y = 0.0;
@@ -132,6 +141,17 @@ void OmnidirectionalWalkZMP::update(double elapsedTime, Joints &joints, float &X
     double zFrac = computeZFrac(t);
     double thetaFrac = computeThetaFrac(t);
 
+    // Partida suave: aproxima o CoM lateral do ponto medio entre os pes (no
+    // frame do pe de apoio, que esta na origem, o ponto medio e metade do y do
+    // pe oscilante) e reduz a altura do passo, na proporcao do fator.
+    const double ramp = startRamp(t);
+    if (ramp < 1.0) {
+        const double ySwingNow = swingFootBegin.y
+                                 + (swingFootEnd.y - swingFootBegin.y) * yFrac;
+        const double yMid = 0.5 * ySwingNow;
+        comY = yMid + ramp * (comY - yMid);
+    }
+
     // Calcula a rotação do torso ao longo do passo
     double thetaTorso = torsoBegin.z + (torsoEnd.z - torsoBegin.z) * thetaFrac;
 
@@ -167,7 +187,7 @@ void OmnidirectionalWalkZMP::update(double elapsedTime, Joints &joints, float &X
 
     // Altura do CoM dos pés
     double zSupport = walkParams.zCom;
-    double zSwing = walkParams.zCom - zFrac * walkParams.zStep;
+    double zSwing = walkParams.zCom - zFrac * walkParams.zStep * ramp;
 
     // Determina qual pé está oscilando e configura as posições de acordo
     itandroids_lib::math::Vector3<double> leftFoot;
@@ -239,6 +259,18 @@ void OmnidirectionalWalkZMP::computeNewStep() {
         velocity.z = 0.0;
     }
 
+    // Partida suave: o passo que comeca agora usa a velocidade escalada pelo
+    // fator no meio dele. A escala vale so dentro deste calculo; a velocidade
+    // comandada e restaurada no fim, para nao acumular entre passos.
+    ++stepsSinceRestart;
+    const itandroids_lib::math::Vector3<double> velocityCommanded = velocity;
+    {
+        const double r = startRamp(0.5);
+        velocity.x *= r;
+        velocity.y *= r;
+        velocity.z *= r;
+    }
+
     switchSwingFoot();
 
     torsoBegin = poseRelative(torsoEnd, swingFootEnd);
@@ -298,7 +330,7 @@ void OmnidirectionalWalkZMP::computeNewStep() {
         dx = a * cossine - b * sine;
     }
 
-    if (velocity.z < DBL_EPSILON) {
+    if (std::fabs(velocity.z) < DBL_EPSILON) {
         dx = walkParams.period * velocity.x;
     }
 
@@ -306,6 +338,15 @@ void OmnidirectionalWalkZMP::computeNewStep() {
 
     swingFootEnd = poseGlobal(swingFootEnd, p);
 
+    velocity = velocityCommanded;
+}
+
+double OmnidirectionalWalkZMP::startRamp(double t) const {
+    if (startRampSteps <= 0)
+        return 1.0;
+    double x = (stepsSinceRestart + t) / startRampSteps;
+    x = std::max(0.0, std::min(1.0, x));
+    return x * x * (3.0 - 2.0 * x);   // smoothstep
 }
 
 itandroids_lib::math::Vector3<double> OmnidirectionalWalkZMP::limitTorso(
@@ -340,7 +381,7 @@ void OmnidirectionalWalkZMP::switchSwingFoot() {
 itandroids_lib::math::Vector3<double> OmnidirectionalWalkZMP::getDesiredTorsoDisplacement(
         itandroids_lib::math::Vector3<double> torsoBegin) {
     itandroids_lib::math::Vector3<double> displacement;
-    if (velocity.z < DBL_EPSILON) {
+    if (std::fabs(velocity.z) < DBL_EPSILON) {
         displacement = velocity * walkParams.period;
     } else {
         double a = 2.0 * (velocity.x / velocity.z)
@@ -526,9 +567,41 @@ itandroids_lib::math::Vector3<double> OmnidirectionalWalkZMP::getOdometry() {
     return odometry;
 }
 
+double OmnidirectionalWalkZMP::getPhase() const {
+    if (walkParams.period <= 0.0)
+        return 0.0;
+    return walkTime / walkParams.period;
+}
+
+bool OmnidirectionalWalkZMP::isDoubleSupport() const {
+    // Parado: os dois pes estao no chao o tempo todo.
+    if (stoppingState == STOPPED)
+        return true;
+
+    // Mesmas fronteiras usadas por computeXFrac/YFrac/ZFrac: fora de
+    // [t1, t2] o pe oscilante esta no chao (zFrac = 0).
+    const double t = getPhase();
+    const double t1 = walkParams.doubleSupportRatio / 2.0;
+    const double t2 = 1.0 - t1;
+
+    return (t < t1) || (t > t2);
+}
+
+SupportState OmnidirectionalWalkZMP::getSupportState() const {
+    if (isDoubleSupport())
+        return DOUBLE_SUPPORT;
+
+    return leftFootIsSwing ? RIGHT_SUPPORT : LEFT_SUPPORT;
+}
+
 void OmnidirectionalWalkZMP::requestStop() {
     if (stoppingState == NONE)
         stoppingState = STOP_REQUESTED;
+}
+
+void OmnidirectionalWalkZMP::stopNow() {
+    stoppingState = STOPPED;
+    walkTime = 0.0;
 }
 
 bool OmnidirectionalWalkZMP::hasStopped() {

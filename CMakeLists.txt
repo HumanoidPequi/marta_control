@@ -2,7 +2,8 @@ cmake_minimum_required(VERSION 3.0.2)
 project(marta_controller)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
-# add_compile_options(-std=c++11)
+set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
@@ -11,6 +12,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  sensor_msgs
+  geometry_msgs
+  gazebo_msgs
+  urdf
   message_generation
   marta_msgs
 )
@@ -112,7 +117,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES marta_controller
-  CATKIN_DEPENDS roscpp rospy std_msgs
+  CATKIN_DEPENDS roscpp rospy std_msgs sensor_msgs geometry_msgs gazebo_msgs urdf
 )
 
 ###########
@@ -134,6 +139,8 @@ add_library(${PROJECT_NAME}
   src/MathUtils.cpp
   src/OmnidirectionalWalkZMP.cpp
   src/RobotPhysicalParameters.cpp
+  src/TorsoAttitudeEstimator.cpp
+  src/TorsoStabilizer.cpp
 )
 
 ## Add cmake target dependencies of the library
@@ -152,8 +159,16 @@ add_executable(kick_node
   src/kick.cpp
 )
 
-add_executable(imu_node 
-  src/imu.cpp
+add_executable(torso_attitude_node
+  src/torso_attitude_node.cpp
+)
+
+add_executable(walk_telemetry_node
+  src/walk_telemetry_node.cpp
+)
+
+add_executable(squat_controller_node
+  src/squat_controller.cpp
 )
 
 ## Rename C++ executable without prefix
@@ -171,13 +186,24 @@ target_link_libraries(controller_node
   ${PROJECT_NAME}
   ${catkin_LIBRARIES}
 )
+add_dependencies(controller_node ${catkin_EXPORTED_TARGETS})
 
 target_link_libraries(kick_node
   ${PROJECT_NAME}
   ${catkin_LIBRARIES}
 )
 
-target_link_libraries(imu_node
+target_link_libraries(torso_attitude_node
+  ${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+)
+
+target_link_libraries(walk_telemetry_node
+  ${catkin_LIBRARIES}
+)
+add_dependencies(walk_telemetry_node ${catkin_EXPORTED_TARGETS})
+
+target_link_libraries(squat_controller_node
   ${PROJECT_NAME}
   ${catkin_LIBRARIES}
 )
