@@ -32,13 +32,30 @@
  *   rate_hz        (double, 100.0)  taxa de publicacao
  *   model_name     (string, "marta") prefixo dos links em /gazebo/link_states
  *   world_frame    (string, "odom")
+ *   publish_world_tf (bool, true) TF world_frame -> base_link pela verdade de
+ *                  solo, para visualizacao (Foxglove/RViz): sem ela o
+ *                  robot_state_publisher so da as juntas relativas ao tronco e
+ *                  o robo "anda" parado no lugar.
+ *
+ * Visualizacao (alem da telemetria):
+ *   /robot_description  std_msgs/String latched, copia do parametro, para o
+ *                       URDF entrar nos bags.
+ *   /marta/viz/rumo     visualization_msgs/MarkerArray: seta do rumo atual
+ *                       (yaw verdadeiro) e do rumo desejado da malha de rumo.
+ *   /marta/viz/rumo_graus  Float64MultiArray [yaw_verdadeiro, rumo_desejado,
+ *                       erro] em graus, para plotar direto (o Plot do Foxglove
+ *                       nao subtrai series).
  */
 
 #include <ros/ros.h>
 #include <gazebo_msgs/LinkStates.h>
 #include <sensor_msgs/Imu.h>
 #include <std_msgs/Float64MultiArray.h>
+#include <std_msgs/String.h>
+#include <geometry_msgs/TransformStamped.h>
+#include <tf2_ros/transform_broadcaster.h>
 #include <urdf/model.h>
+#include <visualization_msgs/MarkerArray.h>
 
 #include <marta_msgs/WalkReference.h>
 #include <marta_msgs/WalkTelemetry.h>
@@ -92,8 +109,11 @@ public:
 
 private:
     ros::NodeHandle nh_;
-    ros::Subscriber link_sub_, ref_sub_, attitude_sub_;
-    ros::Publisher pub_;
+    ros::Subscriber link_sub_, ref_sub_, attitude_sub_, debug_sub_;
+    ros::Publisher pub_, urdf_pub_, rumo_pub_, rumo_graus_pub_;
+    tf2_ros::TransformBroadcaster tf_broadcaster_;
+    bool publish_world_tf_;
+    double last_tf_stamp_;
     ros::Timer timer_;
 
     std::string model_name_, world_frame_;
@@ -107,6 +127,8 @@ private:
     marta_msgs::WalkReference::ConstPtr ref_;
     double pitch_, pitch_rate_, roll_, roll_rate_;
     bool has_attitude_;
+    double heading_error_;   ///< erro da malha de rumo (yaw estimado - referencia)
+    bool has_heading_;
 
     // Estado anterior, para a aceleracao do CoM usada no ZMP estimado.
     bool has_prev_;
@@ -124,12 +146,16 @@ private:
         ref_ = msg;
     }
     void attitudeCb(const std_msgs::Float64MultiArray::ConstPtr &msg);
+    void debugCb(const std_msgs::Float64MultiArray::ConstPtr &msg);
+    void publishViz(const geometry_msgs::Pose &base_pose, double yaw_true,
+                    const ros::Time &stamp);
     void update(const ros::TimerEvent &);
 };
 
 WalkTelemetryNode::WalkTelemetryNode(ros::NodeHandle &nh)
-    : nh_(nh), total_mass_(0.0), pitch_(0.0), pitch_rate_(0.0), roll_(0.0),
-      roll_rate_(0.0), has_attitude_(false), has_prev_(false), prev_vx_(0.0),
+    : nh_(nh), publish_world_tf_(true), last_tf_stamp_(-1.0), total_mass_(0.0), pitch_(0.0), pitch_rate_(0.0), roll_(0.0),
+      roll_rate_(0.0), has_attitude_(false), heading_error_(0.0),
+      has_heading_(false), has_prev_(false), prev_vx_(0.0),
       prev_vy_(0.0), prev_stamp_(0.0) {
     ros::NodeHandle pnh("~");
     double rate_hz;
@@ -149,10 +175,14 @@ WalkTelemetryNode::WalkTelemetryNode(ros::NodeHandle &nh)
     // link states na taxa da fisica. Este parametro existe para medir esse
     // custo: com false o no sobe e nao assina, isolando o efeito.
     pnh.param<bool>("use_link_states", use_link_states_, true);
-
-    loadMasses();
+    pnh.param<bool>("publish_world_tf", publish_world_tf_, true);
 
     pub_ = nh_.advertise<marta_msgs::WalkTelemetry>("/marta/walk/telemetry", 10);
+    urdf_pub_ = nh_.advertise<std_msgs::String>("/robot_description", 1, true);
+    rumo_pub_ = nh_.advertise<visualization_msgs::MarkerArray>("/marta/viz/rumo", 1);
+    rumo_graus_pub_ = nh_.advertise<std_msgs::Float64MultiArray>("/marta/viz/rumo_graus", 10);
+
+    loadMasses();
 
     // queue_size 1 em tudo: sempre a amostra mais recente, nunca uma fila
     // acumulada que atrasaria a telemetria e consumiria CPU a toa.
@@ -166,6 +196,8 @@ WalkTelemetryNode::WalkTelemetryNode(ros::NodeHandle &nh)
                              &WalkTelemetryNode::refCb, this);
     attitude_sub_ = nh_.subscribe("/marta/torso_attitude", 1,
                                   &WalkTelemetryNode::attitudeCb, this);
+    debug_sub_ = nh_.subscribe("/marta/stabilizer_debug", 1,
+                               &WalkTelemetryNode::debugCb, this);
 
     timer_ = nh_.createTimer(ros::Duration(1.0 / rate_hz),
                              &WalkTelemetryNode::update, this);
@@ -180,12 +212,18 @@ WalkTelemetryNode::WalkTelemetryNode(ros::NodeHandle &nh)
  * expor em /gazebo/link_states (juntas fixas sao absorvidas no pai).
  */
 void WalkTelemetryNode::loadMasses() {
+    std::string xml;
     urdf::Model model;
-    if (!model.initParam("robot_description")) {
+    if (!nh_.getParam("robot_description", xml) || !model.initString(xml)) {
         ROS_ERROR("[WalkTelemetry] nao consegui ler /robot_description; "
                   "o CoM nao pode ser calculado.");
         return;
     }
+    // Copia latched do URDF: o parametro nao vai para o bag, o topico vai.
+    std_msgs::String urdf_msg;
+    urdf_msg.data = xml;
+    urdf_pub_.publish(urdf_msg);
+
     for (const auto &kv : model.links_) {
         const urdf::LinkConstSharedPtr &link = kv.second;
         if (!link->inertial || link->inertial->mass <= 0.0) {
@@ -209,6 +247,95 @@ void WalkTelemetryNode::attitudeCb(const std_msgs::Float64MultiArray::ConstPtr &
     roll_ = msg->data[2];
     roll_rate_ = msg->data[3];
     has_attitude_ = true;
+}
+
+/** /marta/stabilizer_debug: [..., heading_error (7), heading_correction (8)]. */
+void WalkTelemetryNode::debugCb(const std_msgs::Float64MultiArray::ConstPtr &msg) {
+    if (msg->data.size() < 9) {
+        return;
+    }
+    std::lock_guard<std::mutex> lock(mutex_);
+    heading_error_ = msg->data[7];
+    has_heading_ = true;
+}
+
+/**
+ * TF do mundo e setas de rumo. O rumo desejado no frame da verdade e
+ * yaw_true - heading_error: a malha guarda a referencia no yaw ESTIMADO, e o
+ * erro dela e o mesmo nos dois frames enquanto o estimador nao deriva (mesma
+ * conta do experiments/plot_rumo.py). Parado, heading_error = 0 e as duas setas
+ * coincidem.
+ */
+void WalkTelemetryNode::publishViz(const geometry_msgs::Pose &base_pose, double yaw_true,
+                                   const ros::Time &stamp) {
+    // Com use_sim_time o timer pode disparar duas vezes no mesmo instante
+    // simulado; TF repetida gera aviso de TF_REPEATED_DATA no tf2.
+    if (publish_world_tf_ && stamp.toSec() > last_tf_stamp_) {
+        geometry_msgs::TransformStamped tf;
+        tf.header.stamp = stamp;
+        tf.header.frame_id = world_frame_;
+        tf.child_frame_id = "base_link";
+        tf.transform.translation.x = base_pose.position.x;
+        tf.transform.translation.y = base_pose.position.y;
+        tf.transform.translation.z = base_pose.position.z;
+        tf.transform.rotation = base_pose.orientation;
+        tf_broadcaster_.sendTransform(tf);
+        last_tf_stamp_ = stamp.toSec();
+    }
+
+    double heading_error;
+    bool has_heading;
+    {
+        std::lock_guard<std::mutex> lock(mutex_);
+        heading_error = heading_error_;
+        has_heading = has_heading_;
+    }
+
+    visualization_msgs::MarkerArray arr;
+    const char *nomes[2] = {"rumo_atual", "rumo_desejado"};
+    const double yaws[2] = {yaw_true, yaw_true - (has_heading ? heading_error : 0.0)};
+    // Atual: azul; desejado: laranja (paleta das figuras).
+    const double cores[2][3] = {{0.165, 0.471, 0.839}, {0.922, 0.408, 0.204}};
+    for (int k = 0; k < 2; ++k) {
+        visualization_msgs::Marker m;
+        m.header.stamp = stamp;
+        m.header.frame_id = world_frame_;
+        m.ns = nomes[k];
+        m.id = k;
+        m.type = visualization_msgs::Marker::ARROW;
+        m.action = visualization_msgs::Marker::ADD;
+        geometry_msgs::Point a, b;
+        a.x = base_pose.position.x;
+        a.y = base_pose.position.y;
+        a.z = base_pose.position.z + 0.12 + 0.01 * k;   // acima da cabeca
+        b = a;
+        b.x += 0.3 * std::cos(yaws[k]);
+        b.y += 0.3 * std::sin(yaws[k]);
+        m.points.push_back(a);
+        m.points.push_back(b);
+        m.scale.x = 0.012;   // diametro da haste
+        m.scale.y = 0.03;    // diametro da ponta
+        m.scale.z = 0.05;    // comprimento da ponta
+        m.color.r = cores[k][0];
+        m.color.g = cores[k][1];
+        m.color.b = cores[k][2];
+        m.color.a = 1.0;
+        m.pose.orientation.w = 1.0;
+        arr.markers.push_back(m);
+    }
+    rumo_pub_.publish(arr);
+
+    // Em graus e com o rumo desejado levado para perto do atual (sem salto de
+    // 360 graus quando um dos dois cruza +-180).
+    const double rad2deg = 180.0 / M_PI;
+    const double err = std::atan2(std::sin(yaws[0] - yaws[1]), std::cos(yaws[0] - yaws[1]));
+    std_msgs::Float64MultiArray g;
+    g.layout.dim.resize(1);
+    g.layout.dim[0].label = "yaw_verdadeiro,rumo_desejado,erro";
+    g.layout.dim[0].size = 3;
+    g.layout.dim[0].stride = 3;
+    g.data = {yaws[0] * rad2deg, (yaws[0] - err) * rad2deg, err * rad2deg};
+    rumo_graus_pub_.publish(g);
 }
 
 void WalkTelemetryNode::update(const ros::TimerEvent &) {
@@ -295,6 +422,7 @@ void WalkTelemetryNode::update(const ros::TimerEvent &) {
         quatToRollPitch(base_pose.orientation, out.roll_true, out.pitch_true);
         out.yaw_true = quatToYaw(base_pose.orientation);
         out.yaw_rate_true = base_wz;
+        publishViz(base_pose, out.yaw_true, out.header.stamp);
     }
     if (has_left) {
         out.left_foot_yaw = quatToYaw(left_foot_pose.orientation);

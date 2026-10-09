@@ -16,6 +16,8 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   gazebo_msgs
   urdf
+  tf2_ros
+  visualization_msgs
   message_generation
   marta_msgs
 )
@@ -117,7 +119,7 @@ include_directories(${EIGEN3_INCLUDE_DIR})
 catkin_package(
   INCLUDE_DIRS include
   LIBRARIES marta_controller
-  CATKIN_DEPENDS roscpp rospy std_msgs sensor_msgs geometry_msgs gazebo_msgs urdf
+  CATKIN_DEPENDS roscpp rospy std_msgs sensor_msgs geometry_msgs gazebo_msgs urdf tf2_ros visualization_msgs
 )
 
 ###########
