@@ -16,8 +16,8 @@ RobotPhysicalParameters RobotPhysicalParameters::getMartaPhysicalParameters() {
     RobotPhysicalParameters physicalParameters;
 
     //physicalParameters.torsoToLeftHip = itandroids_lib::math::Vector3<double>(0.010146, 0.040285, -0.027776);
-    physicalParameters.torsoToLeftHip = itandroids_lib::math::Vector3<double>(0.027349, 0.040504, -0.059509);
-    physicalParameters.leftAnkleToLeftFoot = itandroids_lib::math::Vector3<double>(0.0, 0.0, -0.13305);
+    physicalParameters.torsoToLeftHip = itandroids_lib::math::Vector3<double>(0.013349, 0.040504, -0.059509);
+    physicalParameters.leftAnkleToLeftFoot = itandroids_lib::math::Vector3<double>(0.0, 0.0, -0.03705);
 
     physicalParameters.armLength = 0.314815;
 

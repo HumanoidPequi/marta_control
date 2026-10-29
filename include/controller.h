@@ -15,6 +15,7 @@
 #include "OmnidirectionalWalkZMP.h"
 #include "InverseKinematics.h"
 #include "TorsoStabilizer.h"
+#include "LegGravityCompensation.h"
 #include <thread>
 #include <std_srvs/Trigger.h>
 #include <marta_msgs/Levantar.h>
@@ -164,6 +165,10 @@ private:
     // Estabilizador de atitude do tronco (Fase 2: pitch). Vive na thread
     // Update(), que é a única a chamá-lo.
     stabilization::TorsoStabilizer stabilizer_;
+
+    // Compensacao de gravidade nas pernas (feedforward, plano_fase3_roll.md
+    // §4.2). Declarada depois de nh_, que ela usa.
+    stabilization::LegGravityCompensation gravityComp_{nh_};
 
     void imuCallback(const sensor_msgs::Imu::ConstPtr& msg);
     void attitudeCallback(const std_msgs::Float64MultiArray::ConstPtr &msg);

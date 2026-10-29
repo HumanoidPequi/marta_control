@@ -42,6 +42,7 @@ struct OmnidirectionalWalkZMPParams {
     double ySeparation;
     double armsCompensationFactor;
     double comSwingFactor;
+    double hipPitchOffset;  // [rad], somado ao hip pitch dos dois lados depois da IK
 
     OmnidirectionalWalkZMPParams();
     static OmnidirectionalWalkZMPParams getDefaultOmnidirecionalWalkZMPParams();
@@ -119,6 +120,14 @@ public:
 
     /** Estado de apoio no instante atual do ciclo. */
     SupportState getSupportState() const;
+
+    /**
+     * Fracao do peso em cada perna (somam 1), interpolada nos apoios duplos
+     * como em Maximo (doutorado, eq. 4.23-4.24): a perna de apoio do passo vai
+     * de 0,5 a 1 no apoio duplo inicial, fica em 1 no apoio simples e volta a
+     * 0,5 no apoio duplo final; continuo na troca de passo. Parado: 0,5 cada.
+     */
+    void getLoadWeights(double &left, double &right) const;
 
     /** Parametros do LIPM e da marcha (zCom, period, doubleSupportRatio, ...). */
     const OmnidirectionalWalkZMPParams &getParams() const { return walkParams; }

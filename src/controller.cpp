@@ -452,6 +452,13 @@ void ControllerNode::Agacha(Joints &joints) {
 void ControllerNode::Update(Joints &joints){
     // Configuração dos parâmetros físicos do robô
     representations::RobotPhysicalParameters physicalParams = representations::RobotPhysicalParameters::getMartaPhysicalParameters();
+    // x do quadril em relacao ao tronco na IK. O default (codigo) foi ajustado
+    // empiricamente com o joelho cedendo; com a compensacao de gravidade o
+    // geometrico do URDF (0,0036) volta a fazer sentido (ajustes_marcha.md).
+    nh_.param<double>("hip_offset_x", physicalParams.torsoToLeftHip.x,
+                      physicalParams.torsoToLeftHip.x);
+    ROS_INFO("[Controller] hip_offset_x (tronco -> quadril, IK) = %.4f m",
+             physicalParams.torsoToLeftHip.x);
 
     // Configuração dos parâmetros do andar
     OmnidirectionalWalkZMPParams walkParams = OmnidirectionalWalkZMPParams::getDefaultOmnidirecionalWalkZMPParams();
@@ -463,6 +470,22 @@ void ControllerNode::Update(Joints &joints){
     // Exposto como parametro para que isso possa ser MEDIDO, nao so corrigido.
     nh_.param<double>("com_swing_factor", walkParams.comSwingFactor,
                       walkParams.comSwingFactor);
+    // Demais parametros do gerador, para experimentos de postura e de marcha
+    // sem recompilar (plano_comparacao_darwin.md). Defaults = os do gerador.
+    // z_com e a altura do tronco usada pela IK: subir z_com estica a perna.
+    nh_.param<double>("z_com", walkParams.zCom, walkParams.zCom);
+    nh_.param<double>("z_step", walkParams.zStep, walkParams.zStep);
+    nh_.param<double>("step_period", walkParams.period, walkParams.period);
+    nh_.param<double>("double_support_ratio", walkParams.doubleSupportRatio,
+                      walkParams.doubleSupportRatio);
+    nh_.param<double>("y_separation", walkParams.ySeparation, walkParams.ySeparation);
+    double hipPitchOffsetDeg = walkParams.hipPitchOffset * 180.0 / M_PI;
+    nh_.param<double>("hip_pitch_offset_deg", hipPitchOffsetDeg, hipPitchOffsetDeg);
+    walkParams.hipPitchOffset = hipPitchOffsetDeg * M_PI / 180.0;
+    ROS_INFO("[Controller] hip_pitch_offset = %.2f graus", hipPitchOffsetDeg);
+    ROS_INFO("[Controller] zCom=%.4f zStep=%.3f period=%.3f ds=%.2f ySep=%.3f",
+             walkParams.zCom, walkParams.zStep, walkParams.period,
+             walkParams.doubleSupportRatio, walkParams.ySeparation);
     ROS_INFO("[Controller] comSwingFactor=%.4f -> tZMP=%.4f s",
              walkParams.comSwingFactor,
              sqrt(walkParams.zCom * walkParams.comSwingFactor / 9.80665));
@@ -514,6 +537,9 @@ void ControllerNode::Update(Joints &joints){
 
     // Chame a função setDesiredVelocity
     walker.setDesiredVelocity(desiredVelocity);
+
+    // Compensacao de gravidade: modelo do robot_description e Kp dos servos.
+    gravityComp_.init(isReal_);
 
     // Fazendo a Marta agachar lentamente
     float xscale = Xscale_.load();
@@ -574,6 +600,7 @@ void ControllerNode::Update(Joints &joints){
             }
             walker.restart();
             stabilizer_.reset();
+            gravityComp_.reset();
 
         }else if(fallenBackward){
             ROS_WARN_THROTTLE(2.0, "Marta esta deitada para tras. Tentando levantar");
@@ -591,6 +618,7 @@ void ControllerNode::Update(Joints &joints){
             }
             walker.restart();
             stabilizer_.reset();
+            gravityComp_.reset();
 
         }else{
             desiredVelocity.translation.x = translationX_.load(); // Velocidade no eixo x
@@ -617,6 +645,7 @@ void ControllerNode::Update(Joints &joints){
                 paramRefreshCounter = 0;
                 refreshStabilizerParams();
                 refreshHeadingParams();
+                gravityComp_.refreshParams();
 
                 // walk_enabled pode ser chaveado em tempo de execução, para
                 // assentar o robô em pé e só então mandar andar.
@@ -638,6 +667,14 @@ void ControllerNode::Update(Joints &joints){
             }
 
             const SupportState support = walker.getSupportState();
+
+            // Compensacao de gravidade (feedforward): soma tau/Kp aos alvos de
+            // perna da IK, antes da correcao do estabilizador de pitch.
+            {
+                double wLeft, wRight;
+                walker.getLoadWeights(wLeft, wRight);
+                gravityComp_.apply(joints, wLeft, wRight, elapsedTime);
+            }
 
             // Referencia de marcha: publicada ANTES do bloco que depende da
             // atitude, de proposito. A telemetria do plano nao pode ficar muda

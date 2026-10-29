@@ -143,6 +143,7 @@ add_library(${PROJECT_NAME}
   src/RobotPhysicalParameters.cpp
   src/TorsoAttitudeEstimator.cpp
   src/TorsoStabilizer.cpp
+  src/GravityCompensator.cpp
 )
 
 ## Add cmake target dependencies of the library
@@ -155,6 +156,7 @@ add_library(${PROJECT_NAME}
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(controller_node 
   src/controller.cpp
+  src/LegGravityCompensation.cpp
 )
 
 add_executable(kick_node 
@@ -168,6 +170,10 @@ add_executable(torso_attitude_node
 add_executable(walk_telemetry_node
   src/walk_telemetry_node.cpp
 )
+
+# Verificacao offline do GravityCompensator (rosrun ... test_gravity_compensator <urdf>)
+add_executable(test_gravity_compensator test/test_gravity_compensator.cpp)
+target_link_libraries(test_gravity_compensator ${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(squat_controller_node
   src/squat_controller.cpp

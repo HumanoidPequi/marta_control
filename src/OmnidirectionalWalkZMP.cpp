@@ -23,19 +23,21 @@ using itandroids_lib::math::MathUtils;
 
 OmnidirectionalWalkZMPParams::OmnidirectionalWalkZMPParams() :
         period(0.0), zCom(0.0), zStep(0.0), doubleSupportRatio(0.0), ySeparation(
-        0.0), armsCompensationFactor(0.0), comSwingFactor(0.0) {
+        0.0), armsCompensationFactor(0.0), comSwingFactor(0.0), hipPitchOffset(0.0) {
     
 }
 
 OmnidirectionalWalkZMPParams OmnidirectionalWalkZMPParams::getDefaultOmnidirecionalWalkZMPParams() {
     OmnidirectionalWalkZMPParams params;
-    params.period = 0.4;
-    params.doubleSupportRatio = 0.5;          // Proporção de tempo em que ambos os pés estão no chão
-    params.ySeparation = 0.08;                // Separação lateral entre os pés.
-    params.zCom = 0.297509;                   // Altura do centro de massa (CoM - Center of Mass)
-    params.zStep = 0.06;                      // Altura do movimento oscilatório do pé durante o passo
+    // Valores de out/2026 (docs/ajustes_marcha.md); os anteriores entre colchetes.
+    params.period = 0.6;                      // Duração de UM passo [0,4]: mais tempo de balanço
+    params.doubleSupportRatio = 0.3;          // Proporção de tempo em que ambos os pés estão no chão [0,5]
+    params.ySeparation = 0.06;                // Distância tronco-pé em y, metade da separação entre os pés [0,08]
+    params.zCom = 0.252;                      // Altura do TRONCO na IK, não do CoM real [0,297509]; joelho a ~70°
+    params.zStep = 0.08;                      // Altura planejada do pé no balanço [0,06]
     params.armsCompensationFactor = 1.0;      // Fator de compensação do movimento dos braços para equilibrar o movimento do torso
     params.comSwingFactor = 1.0;              // Fator que ajusta a amplitude do movimento do CoM
+    params.hipPitchOffset = -5.0 * M_PI / 180.0;  // Inclina o tronco ~5° para a frente (eixos pitch paralelos)
     return params;
 }
 
@@ -221,9 +223,12 @@ void OmnidirectionalWalkZMP::update(double elapsedTime, Joints &joints, float &X
     inverseKinematics->computeJointsTargets(leftFoot.x, leftFoot.y, zLeft,
                                             leftFoot.z, rightFoot.x, rightFoot.y, zRight, rightFoot.z, joints, Xscale_);
 
-    // Ajuste fino na postura para evitar sobrecarga nos quadris
-    joints.leftHipPitch -= 5.0 * M_PI / 180.0;
-    joints.rightHipPitch -= 5.0 * M_PI / 180.0;
+    // Ajuste fino na postura para evitar sobrecarga nos quadris. Como os eixos
+    // pitch de quadril, joelho e tornozelo sao paralelos, com o pe plano o tronco
+    // inclina -hipPitchOffset (para a frente) menos a cedencia somada dos servos
+    // (panorama_parametros.md).
+    joints.leftHipPitch += walkParams.hipPitchOffset;
+    joints.rightHipPitch += walkParams.hipPitchOffset;
 
     // Armazena estado atual dos pés
     leftFoot_ = leftFoot;
@@ -571,6 +576,29 @@ double OmnidirectionalWalkZMP::getPhase() const {
     if (walkParams.period <= 0.0)
         return 0.0;
     return walkTime / walkParams.period;
+}
+
+void OmnidirectionalWalkZMP::getLoadWeights(double &left, double &right) const {
+    if (stoppingState == STOPPED) {
+        left = right = 0.5;
+        return;
+    }
+    const double t = getPhase();
+    const double t1 = walkParams.doubleSupportRatio / 2.0;
+    const double t2 = 1.0 - t1;
+    double wSupport = 1.0;
+    if (t1 > 0.0 && t < t1)
+        wSupport = 0.5 + 0.5 * t / t1;
+    else if (t1 > 0.0 && t > t2)
+        wSupport = 1.0 - 0.5 * (t - t2) / t1;
+    // A perna de apoio do passo e a que NAO esta em balanco.
+    if (leftFootIsSwing) {
+        right = wSupport;
+        left = 1.0 - wSupport;
+    } else {
+        left = wSupport;
+        right = 1.0 - wSupport;
+    }
 }
 
 bool OmnidirectionalWalkZMP::isDoubleSupport() const {
