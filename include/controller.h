@@ -15,12 +15,14 @@
 #include "OmnidirectionalWalkZMP.h"
 #include "InverseKinematics.h"
 #include "TorsoStabilizer.h"
+#include "RollStabilizer.h"
 #include "LegGravityCompensation.h"
 #include <thread>
 #include <std_srvs/Trigger.h>
 #include <marta_msgs/Levantar.h>
 #include <marta_msgs/WalkReference.h>
 #include <sensor_msgs/Imu.h>
+#include <geometry_msgs/Twist.h>
 
 namespace control {
 namespace walking {
@@ -114,6 +116,21 @@ private:
     double walk_velocity_y_ = 0.0;
     double walk_velocity_yaw_ = 0.0;
 
+    // Teleoperacao (cmd_vel_enabled): com ela ligada, a velocidade vem de
+    // /marta/cmd_vel (geometry_msgs/Twist: linear.x, linear.y, angular.z) em
+    // vez de walk_velocity_*. Limitada ao envelope testado; sem mensagem por
+    // cmd_vel_timeout s, o comando vai a zero (marcha no lugar).
+    bool cmd_vel_enabled_ = false;
+    double cmd_vel_timeout_ = 0.5;
+    double cmd_vel_max_x_ = 0.15;
+    double cmd_vel_max_y_ = 0.05;
+    double cmd_vel_max_yaw_ = 0.35;
+    std::atomic<float> cmdVx_{0.0f};
+    std::atomic<float> cmdVy_{0.0f};
+    std::atomic<float> cmdWz_{0.0f};
+    std::atomic<double> cmdVelStamp_{-1.0};
+    ros::Subscriber cmd_vel_sub_;
+
     float dt;
 
     // ── Estado compartilhado entre os callbacks do ROS e a thread Update() ──
@@ -170,10 +187,16 @@ private:
     // §4.2). Declarada depois de nh_, que ela usa.
     stabilization::LegGravityCompensation gravityComp_{nh_};
 
+    // Estabilizador de roll (Fase 3, plano_fase3_roll.md par. 4.3): P+D com
+    // washout no hip roll e no ankle roll, ponderado pelo peso de carga.
+    stabilization::RollStabilizer rollStabilizer_;
+    ros::Publisher roll_debug_pub_;
+
     void imuCallback(const sensor_msgs::Imu::ConstPtr& msg);
     void attitudeCallback(const std_msgs::Float64MultiArray::ConstPtr &msg);
     void timerCallback(const ros::TimerEvent &event);
     void ballDistanceCallback(const std_msgs::Float32::ConstPtr &msg);
+    void cmdVelCallback(const geometry_msgs::Twist::ConstPtr &msg);
     void Update(Joints &joints);
     void calculateVelocity();
     float normalize(float x);
@@ -189,6 +212,12 @@ private:
 
     /** Rele heading_enabled, kp_heading e max_heading_rate. */
     void refreshHeadingParams();
+
+    /** Rele os parametros do estabilizador de roll (forcado off se isReal). */
+    void refreshRollParams();
+
+    /** Publica /marta/roll_stabilizer (layout no label da mensagem). */
+    void publishRollDebug(const stabilization::RollStabilizerState &state, double roll);
 
     /**
      * Correcao de rotacao [rad/s] a somar ao comando, para manter o rumo do

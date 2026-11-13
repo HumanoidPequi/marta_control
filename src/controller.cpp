@@ -1,5 +1,6 @@
 #include <iostream>
 #include "controller.h"
+#include <algorithm>
 
 using namespace control::walking;
 using itandroids_lib::math::Pose2D;
@@ -28,6 +29,16 @@ ControllerNode::ControllerNode(Joints &joints) :
     ROS_INFO("[Controller] walk_enabled=%s (vx=%.3f vy=%.3f wz=%.3f)",
              walkEnabled ? "true" : "false", walk_velocity_x_,
              walk_velocity_y_, walk_velocity_yaw_);
+    nh_.param<bool>("cmd_vel_enabled", cmd_vel_enabled_, false);
+    nh_.param<double>("cmd_vel_timeout", cmd_vel_timeout_, 0.5);
+    nh_.param<double>("cmd_vel_max_x", cmd_vel_max_x_, 0.15);
+    nh_.param<double>("cmd_vel_max_y", cmd_vel_max_y_, 0.05);
+    nh_.param<double>("cmd_vel_max_yaw", cmd_vel_max_yaw_, 0.35);
+    if (cmd_vel_enabled_) {
+        ROS_INFO("[Controller] TELEOP: velocidade de /marta/cmd_vel (walk_velocity_* "
+                 "ignorados); limites |vx| %.3f |vy| %.3f |wz| %.3f, timeout %.2f s",
+                 cmd_vel_max_x_, cmd_vel_max_y_, cmd_vel_max_yaw_, cmd_vel_timeout_);
+    }
 
     stabilizer_.setParams(loadStabilizerParams());
 
@@ -64,6 +75,8 @@ ControllerNode::ControllerNode(Joints &joints) :
 
     stabilizer_debug_pub_ = nh_.advertise<std_msgs::Float64MultiArray>(
             "/marta/stabilizer_debug", 10);
+    roll_debug_pub_ = nh_.advertise<std_msgs::Float64MultiArray>(
+            "/marta/roll_stabilizer", 10);
     walk_reference_pub_ = nh_.advertise<marta_msgs::WalkReference>(
             "/marta/walk/reference", 10);
 
@@ -112,12 +125,23 @@ ControllerNode::ControllerNode(Joints &joints) :
     // Subscribers (criados antes das threads, para que elas ja partam com dados)
     imu_sub_ = nh_.subscribe("/marta/imu", 100, &ControllerNode::imuCallback, this);
     ball_distance_sub_ = nh_.subscribe("/marta/ball_distance", 10, &ControllerNode::ballDistanceCallback, this);
+    if (cmd_vel_enabled_) {
+        cmd_vel_sub_ = nh_.subscribe("/marta/cmd_vel", 10, &ControllerNode::cmdVelCallback, this);
+    }
     std::string attitude_topic;
     nh_.param<std::string>("attitude_topic", attitude_topic, "/marta/torso_attitude");
     attitude_sub_ = nh_.subscribe(attitude_topic, 10, &ControllerNode::attitudeCallback, this);
 
     functionThread_ = std::thread(std::bind(&ControllerNode::Update, this, joints));
     calculateVelocity_ = std::thread(std::bind(&ControllerNode::calculateVelocity, this));
+}
+
+void ControllerNode::cmdVelCallback(const geometry_msgs::Twist::ConstPtr& msg) {
+    auto lim = [](double v, double m) { return std::max(-m, std::min(m, v)); };
+    cmdVx_.store(static_cast<float>(lim(msg->linear.x, cmd_vel_max_x_)));
+    cmdVy_.store(static_cast<float>(lim(msg->linear.y, cmd_vel_max_y_)));
+    cmdWz_.store(static_cast<float>(lim(msg->angular.z, cmd_vel_max_yaw_)));
+    cmdVelStamp_.store(ros::Time::now().toSec());
 }
 
 void ControllerNode::ballDistanceCallback(const std_msgs::Float32::ConstPtr& msg) {
@@ -243,6 +267,44 @@ double ControllerNode::headingCorrection(double rotationCommand, double dt) {
     lastHeadingError_ = error;
     lastHeadingCorrection_ = correction;
     return correction;
+}
+
+void ControllerNode::refreshRollParams() {
+    stabilization::RollStabilizerParams p = rollStabilizer_.getParams();
+    const stabilization::RollStabilizerParams prev = p;
+    nh_.getParamCached("roll_stabilizer_enabled", p.enabled);
+    nh_.getParamCached("kp_roll_hip", p.kpHip);
+    nh_.getParamCached("kd_roll_hip", p.kdHip);
+    nh_.getParamCached("kp_roll_ankle", p.kpAnkle);
+    nh_.getParamCached("kd_roll_ankle", p.kdAnkle);
+    nh_.getParamCached("roll_washout_tau", p.washoutTau);
+    nh_.getParamCached("max_roll_correction", p.maxCorrection);
+    if (isReal_ && p.enabled) {
+        // Os ganhos foram sintonizados contra o modelo de servo do Gazebo.
+        ROS_WARN_ONCE("[RollStab] isReal=true: estabilizador de roll DESLIGADO.");
+        p.enabled = false;
+    }
+    if (p.enabled != prev.enabled || p.kpHip != prev.kpHip || p.kdHip != prev.kdHip
+            || p.kpAnkle != prev.kpAnkle || p.kdAnkle != prev.kdAnkle
+            || p.washoutTau != prev.washoutTau || p.maxCorrection != prev.maxCorrection) {
+        rollStabilizer_.setParams(p);
+        ROS_INFO("[RollStab] %s  quadril kp=%.3f kd=%.3f  tornozelo kp=%.3f kd=%.3f  "
+                 "washout=%.2f s  sat=%.3f rad", p.enabled ? "ATIVO" : "DESATIVADO",
+                 p.kpHip, p.kdHip, p.kpAnkle, p.kdAnkle, p.washoutTau, p.maxCorrection);
+    }
+}
+
+void ControllerNode::publishRollDebug(const stabilization::RollStabilizerState &s,
+                                      double roll) {
+    std_msgs::Float64MultiArray msg;
+    msg.layout.dim.resize(1);
+    msg.layout.dim[0].label = "enabled,roll,roll_mean,error,u_hip,u_ankle,"
+                              "w_left,w_right,saturated";
+    msg.layout.dim[0].size = 9;
+    msg.layout.dim[0].stride = 9;
+    msg.data = {rollStabilizer_.getParams().enabled ? 1.0 : 0.0, roll, s.rollMean, s.error,
+                s.uHip, s.uAnkle, s.leftWeight, s.rightWeight, s.saturated ? 1.0 : 0.0};
+    roll_debug_pub_.publish(msg);
 }
 
 void ControllerNode::refreshStabilizerParams() {
@@ -540,6 +602,7 @@ void ControllerNode::Update(Joints &joints){
 
     // Compensacao de gravidade: modelo do robot_description e Kp dos servos.
     gravityComp_.init(isReal_);
+    refreshRollParams();
 
     // Fazendo a Marta agachar lentamente
     float xscale = Xscale_.load();
@@ -601,6 +664,7 @@ void ControllerNode::Update(Joints &joints){
             walker.restart();
             stabilizer_.reset();
             gravityComp_.reset();
+            rollStabilizer_.reset();
 
         }else if(fallenBackward){
             ROS_WARN_THROTTLE(2.0, "Marta esta deitada para tras. Tentando levantar");
@@ -619,6 +683,7 @@ void ControllerNode::Update(Joints &joints){
             walker.restart();
             stabilizer_.reset();
             gravityComp_.reset();
+            rollStabilizer_.reset();
 
         }else{
             desiredVelocity.translation.x = translationX_.load(); // Velocidade no eixo x
@@ -645,6 +710,7 @@ void ControllerNode::Update(Joints &joints){
                 paramRefreshCounter = 0;
                 refreshStabilizerParams();
                 refreshHeadingParams();
+                refreshRollParams();
                 gravityComp_.refreshParams();
 
                 // walk_enabled pode ser chaveado em tempo de execução, para
@@ -670,11 +736,9 @@ void ControllerNode::Update(Joints &joints){
 
             // Compensacao de gravidade (feedforward): soma tau/Kp aos alvos de
             // perna da IK, antes da correcao do estabilizador de pitch.
-            {
-                double wLeft, wRight;
-                walker.getLoadWeights(wLeft, wRight);
-                gravityComp_.apply(joints, wLeft, wRight, elapsedTime);
-            }
+            double wLeft, wRight;
+            walker.getLoadWeights(wLeft, wRight);
+            gravityComp_.apply(joints, wLeft, wRight, elapsedTime);
 
             // Referencia de marcha: publicada ANTES do bloco que depende da
             // atitude, de proposito. A telemetria do plano nao pode ficar muda
@@ -690,6 +754,13 @@ void ControllerNode::Update(Joints &joints){
                                            joints);
 
                 publishStabilizerDebug(stabState, support, pitch, pitchRate);
+
+                // Roll (Fase 3): depois do pitch; mexe so em hip/ankle roll.
+                const double roll = torsoRoll_.load();
+                const stabilization::RollStabilizerState &rollState =
+                        rollStabilizer_.update(roll, torsoRollRate_.load(), wLeft,
+                                               wRight, elapsedTime, joints);
+                publishRollDebug(rollState, roll);
 
                 if (stabState.saturated) {
                     ROS_WARN_THROTTLE(1.0, "[Stabilizer] correcao saturada em "
@@ -711,6 +782,7 @@ void ControllerNode::Update(Joints &joints){
                 // Sem estimativa de atitude não há realimentação possível:
                 // segue em malha aberta em vez de aplicar correção de lixo.
                 stabilizer_.reset();
+                rollStabilizer_.reset();
                 ROS_WARN_THROTTLE(5.0, "[Controller] sem dados em "
                                   "/marta/torso_attitude; estabilizador inativo. "
                                   "O torso_attitude_node esta rodando?");
@@ -736,6 +808,12 @@ void ControllerNode::calculateVelocity(){
             translationX_.store(0.0f);
             translationY_.store(0.0f);
             rotationZ_.store(0.0f);
+        } else if (cmd_vel_enabled_) {
+            const double idade = ros::Time::now().toSec() - cmdVelStamp_.load();
+            const bool valido = cmdVelStamp_.load() >= 0.0 && idade <= cmd_vel_timeout_;
+            translationX_.store(valido ? cmdVx_.load() : 0.0f);
+            translationY_.store(valido ? cmdVy_.load() : 0.0f);
+            rotationZ_.store(valido ? cmdWz_.load() : 0.0f);
         } else if (dt > 5.0){
             ROS_INFO_THROTTLE(2.0, "Marta nao tem a bola, parando de andar");
             translationX_.store(static_cast<float>(walk_velocity_x_));

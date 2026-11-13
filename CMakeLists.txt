@@ -143,6 +143,7 @@ add_library(${PROJECT_NAME}
   src/RobotPhysicalParameters.cpp
   src/TorsoAttitudeEstimator.cpp
   src/TorsoStabilizer.cpp
+  src/RollStabilizer.cpp
   src/GravityCompensator.cpp
 )
 
@@ -174,6 +175,9 @@ add_executable(walk_telemetry_node
 # Verificacao offline do GravityCompensator (rosrun ... test_gravity_compensator <urdf>)
 add_executable(test_gravity_compensator test/test_gravity_compensator.cpp)
 target_link_libraries(test_gravity_compensator ${PROJECT_NAME} ${catkin_LIBRARIES})
+# Verificacao offline do RollStabilizer (rosrun ... test_roll_stabilizer)
+add_executable(test_roll_stabilizer test/test_roll_stabilizer.cpp)
+target_link_libraries(test_roll_stabilizer ${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(squat_controller_node
   src/squat_controller.cpp
