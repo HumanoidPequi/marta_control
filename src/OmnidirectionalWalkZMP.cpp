@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <math.h>
 #include <cfloat>
+#include <algorithm>
 #include <Vector3.h>
 #include <fstream>
 
@@ -23,7 +24,8 @@ using itandroids_lib::math::MathUtils;
 
 OmnidirectionalWalkZMPParams::OmnidirectionalWalkZMPParams() :
         period(0.0), zCom(0.0), zStep(0.0), doubleSupportRatio(0.0), ySeparation(
-        0.0), armsCompensationFactor(0.0), comSwingFactor(0.0), hipPitchOffset(0.0) {
+        0.0), armsCompensationFactor(0.0), comSwingFactor(0.0), hipPitchOffset(0.0),
+        armShoulderRoll(0.0), armShoulderPitchOffset(0.0), armElbowFlexion(0.0) {
     
 }
 
@@ -38,6 +40,9 @@ OmnidirectionalWalkZMPParams OmnidirectionalWalkZMPParams::getDefaultOmnidirecio
     params.armsCompensationFactor = 1.0;      // Fator de compensação do movimento dos braços para equilibrar o movimento do torso
     params.comSwingFactor = 1.0;              // Fator que ajusta a amplitude do movimento do CoM
     params.hipPitchOffset = -5.0 * M_PI / 180.0;  // Inclina o tronco ~5° para a frente (eixos pitch paralelos)
+    params.armShoulderRoll = 50.0 * M_PI / 180.0; // Ombros abertos a 50° (valor historico, fixo no codigo ate nov/2026)
+    params.armShoulderPitchOffset = 0.0;          // Sem inclinacao fixa do braco
+    params.armElbowFlexion = 0.0;                 // Cotovelo esticado (antes nao era comandado na simulacao)
     return params;
 }
 
@@ -212,11 +217,19 @@ void OmnidirectionalWalkZMP::update(double elapsedTime, Joints &joints, float &X
     double xLeftArm = rightFoot.x * walkParams.armsCompensationFactor;
     double xRightArm = leftFoot.x * walkParams.armsCompensationFactor;
 
-    // Define posições fixas para rotação lateral dos ombros
-    joints.leftShoulderPitch = - asin(xLeftArm / physicalParams.armLength);
-    joints.rightShoulderPitch = - asin(xRightArm / physicalParams.armLength);
-    joints.leftShoulderRoll = MathUtils::degreesToRadians(-50.0);
-    joints.rightShoulderRoll = MathUtils::degreesToRadians(50.0);
+    // Postura dos bracos (docs/bracos.md). No URDF os eixos de pitch do ombro e
+    // do cotovelo sao +y nos dois lados (angulo negativo leva o braco/antebraco
+    // para frente) e o eixo de roll do ombro e -x nos dois lados (esquerdo
+    // negativo e direito positivo abrem para fora). O asin e saturado em +-1
+    // para fatores de compensacao grandes; com os valores historicos nao atua.
+    const double sL = std::max(-1.0, std::min(1.0, xLeftArm / physicalParams.armLength));
+    const double sR = std::max(-1.0, std::min(1.0, xRightArm / physicalParams.armLength));
+    joints.leftShoulderPitch = - asin(sL) - walkParams.armShoulderPitchOffset;
+    joints.rightShoulderPitch = - asin(sR) - walkParams.armShoulderPitchOffset;
+    joints.leftShoulderRoll = - walkParams.armShoulderRoll;
+    joints.rightShoulderRoll = walkParams.armShoulderRoll;
+    joints.leftElbowYaw = - walkParams.armElbowFlexion;
+    joints.rightElbowYaw = - walkParams.armElbowFlexion;
 
 
 	// Calcula a cinemática inversa dos pés

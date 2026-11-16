@@ -464,6 +464,14 @@ void ControllerNode::publishJoints(Joints &joints, float scalar) {
         msg.data = joints.rightShoulderRoll * scalar;
         pubOmbroDireitoRoll_.publish(msg);
 
+        // Cotovelos: antes nao eram publicados (o controlador segurava a
+        // posicao inicial, 0). O default arm_elbow_deg = 0 reproduz isso.
+        msg.data = joints.leftElbowYaw * scalar;
+        pubCotoveloEsquerdoPitch_.publish(msg);
+
+        msg.data = joints.rightElbowYaw * scalar;
+        pubCotoveloDireitoPitch_.publish(msg);
+
         msg.data = joints.leftHipYaw * scalar;
         pubQuadrilEsquerdoYaw_.publish(msg);
 
@@ -545,6 +553,33 @@ void ControllerNode::Update(Joints &joints){
     nh_.param<double>("hip_pitch_offset_deg", hipPitchOffsetDeg, hipPitchOffsetDeg);
     walkParams.hipPitchOffset = hipPitchOffsetDeg * M_PI / 180.0;
     ROS_INFO("[Controller] hip_pitch_offset = %.2f graus", hipPitchOffsetDeg);
+    // Postura e balanco dos bracos (docs/bracos.md). So na simulacao: no robo
+    // real ficam os valores historicos (ombro 50 graus, cotovelo esticado,
+    // fator 1), porque as posturas novas nao foram verificadas no hardware.
+    {
+        double rollDeg = walkParams.armShoulderRoll * 180.0 / M_PI;
+        double pitchDeg = walkParams.armShoulderPitchOffset * 180.0 / M_PI;
+        double elbowDeg = walkParams.armElbowFlexion * 180.0 / M_PI;
+        double s = walkParams.armsCompensationFactor;
+        if (isReal_) {
+            if (nh_.hasParam("arm_shoulder_roll_deg") || nh_.hasParam("arm_shoulder_pitch_deg") ||
+                nh_.hasParam("arm_elbow_deg") || nh_.hasParam("arms_compensation_factor"))
+                ROS_WARN("[Controller] isReal=true: parametros de braco IGNORADOS "
+                         "(postura historica no robo real).");
+        } else {
+            nh_.param<double>("arm_shoulder_roll_deg", rollDeg, rollDeg);
+            nh_.param<double>("arm_shoulder_pitch_deg", pitchDeg, pitchDeg);
+            nh_.param<double>("arm_elbow_deg", elbowDeg, elbowDeg);
+            nh_.param<double>("arms_compensation_factor", s, s);
+            walkParams.armShoulderRoll = rollDeg * M_PI / 180.0;
+            walkParams.armShoulderPitchOffset = pitchDeg * M_PI / 180.0;
+            walkParams.armElbowFlexion = elbowDeg * M_PI / 180.0;
+            walkParams.armsCompensationFactor = s;
+        }
+        ROS_INFO("[Controller] BRACOS: ombro roll %.1f graus, pitch %+.1f graus, "
+                 "cotovelo %.1f graus, fator de balanco s = %.2f",
+                 rollDeg, pitchDeg, elbowDeg, walkParams.armsCompensationFactor);
+    }
     ROS_INFO("[Controller] zCom=%.4f zStep=%.3f period=%.3f ds=%.2f ySep=%.3f",
              walkParams.zCom, walkParams.zStep, walkParams.period,
              walkParams.doubleSupportRatio, walkParams.ySeparation);

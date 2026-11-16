@@ -43,6 +43,12 @@ struct OmnidirectionalWalkZMPParams {
     double armsCompensationFactor;
     double comSwingFactor;
     double hipPitchOffset;  // [rad], somado ao hip pitch dos dois lados depois da IK
+    // Postura dos bracos (docs/bracos.md). Convencao: positivo = abre o ombro
+    // para fora (roll), leva o braco para frente (pitch) e flexiona o cotovelo
+    // levando o antebraco para frente. Os sinais das juntas saem do URDF.
+    double armShoulderRoll;         // [rad] abertura de cada ombro (historico 50 graus)
+    double armShoulderPitchOffset;  // [rad] somado ao balanco nos dois ombros (historico 0)
+    double armElbowFlexion;         // [rad] flexao dos dois cotovelos (historico 0)
 
     OmnidirectionalWalkZMPParams();
     static OmnidirectionalWalkZMPParams getDefaultOmnidirecionalWalkZMPParams();

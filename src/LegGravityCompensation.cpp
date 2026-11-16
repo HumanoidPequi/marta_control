@@ -43,7 +43,9 @@ LegGravityCompensation::LegGravityCompensation(ros::NodeHandle &nh) : nh_(nh) {
     others_ = {{&Joints::leftShoulderPitch, "l_sho_pitch_link"},
                {&Joints::leftShoulderRoll, "l_sho_roll_link"},
                {&Joints::rightShoulderPitch, "r_sho_pitch_link"},
-               {&Joints::rightShoulderRoll, "r_sho_roll_link"}};
+               {&Joints::rightShoulderRoll, "r_sho_roll_link"},
+               {&Joints::leftElbowYaw, "l_el_link"},
+               {&Joints::rightElbowYaw, "r_el_link"}};
 }
 
 bool LegGravityCompensation::init(bool isReal) {

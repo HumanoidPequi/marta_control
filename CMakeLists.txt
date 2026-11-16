@@ -178,6 +178,9 @@ target_link_libraries(test_gravity_compensator ${PROJECT_NAME} ${catkin_LIBRARIE
 # Verificacao offline do RollStabilizer (rosrun ... test_roll_stabilizer)
 add_executable(test_roll_stabilizer test/test_roll_stabilizer.cpp)
 target_link_libraries(test_roll_stabilizer ${PROJECT_NAME} ${catkin_LIBRARIES})
+# Verificacao offline da postura e do balanco dos bracos (rosrun ... test_arm_posture)
+add_executable(test_arm_posture test/test_arm_posture.cpp)
+target_link_libraries(test_arm_posture ${PROJECT_NAME} ${catkin_LIBRARIES})
 
 add_executable(squat_controller_node
   src/squat_controller.cpp
